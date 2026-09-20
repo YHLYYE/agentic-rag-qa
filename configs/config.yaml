@@ -1,0 +1,16 @@
+corpus:
+  name: financebench
+  raw_dir: data/raw
+  index_dir: data/index
+  eval_set_dir: data/eval_set
+embedding:
+  model: BAAI/bge-m3
+  dim: 1024
+retrieval:
+  top_k: 8
+  rerank_top_k: 3
+llm:
+  base_url: https://api.deepseek.com
+  model: deepseek-chat
+graph:
+  max_retry: 2
