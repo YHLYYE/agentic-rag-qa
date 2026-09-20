@@ -31,3 +31,36 @@ def test_verify_node_unsupported():
     }
     out = verify_node(state)
     assert out["grounding_verdict"] == "unsupported"
+
+
+from models import Chunk, RetrievedChunk
+from graph.nodes import retrieve_node, generate_node, critique_node
+
+
+class _FakeLLM:
+    def complete(self, prompt: str) -> str:
+        return "Yes, revenue grew by 20% {{a}}"
+
+
+def test_retrieve_node_uses_retrievers():
+    chunks = [Chunk("a", "revenue grew", "d", "s", 1)]
+    retrievers = {"dense": lambda q, k: [RetrievedChunk(chunks[0], 0.9)],
+                  "bm25": lambda q, k: [RetrievedChunk(chunks[0], 0.5)]}
+    state = {"question": "revenue", "intent": "hybrid", "retrieved_chunks": []}
+    out = retrieve_node(state, retrievers=retrievers)
+    assert len(out["retrieved_chunks"]) == 1
+
+
+def test_critique_node_returns_verdict():
+    state = {"question": "did revenue grow?",
+             "retrieved_chunks": [{"chunk_id": "a", "text": "revenue grew 20%"}]}
+    out = critique_node(state)
+    assert out["retrieval_verdict"] in {"correct", "ambiguous", "incorrect"}
+
+
+def test_generate_node_produces_citations():
+    state = {"question": "did revenue grow?",
+             "retrieved_chunks": [{"chunk_id": "a", "text": "revenue grew 20%"}]}
+    out = generate_node(state, llm=_FakeLLM())
+    assert "{{a}}" in out["candidate_answer"]
+    assert out["citations"] == ["a"]
