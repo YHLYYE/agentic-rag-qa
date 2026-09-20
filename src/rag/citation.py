@@ -9,4 +9,4 @@ def format_citation(chunk: Chunk) -> str:
 
 def parse_citations(text: str) -> list[str]:
     """Extract chunk_id markers of the form {{chunk_id}} from an answer."""
-    return re.findall(r"\{\{([a-f0-9]{16})\}\}", text)
+    return re.findall(r"\{\{([a-f0-9]+)\}\}", text)
