@@ -35,16 +35,26 @@ def _ask(client: OpenAI, prompt: str) -> str:
 
 
 def faithfulness(client, question: str, answer: str, context: str) -> float:
-    prompt = (
-        "你是评估专家。给定问题、检索到的上下文、以及生成的答案，"
-        "判断答案中的每个断言是否都被上下文支持（忠实，无幻觉）。\n\n"
-        f"问题：{question}\n\n上下文：\n{context}\n\n答案：{answer}\n\n"
-        "只输出一个 0~1 的小数：1=完全忠实，0=完全不忠实，0.5=部分忠实。"
-    )
-    try:
-        return float(_ask(client, prompt))
-    except ValueError:
+    """RAGAS 细粒度 faithfulness：拆句 → 逐句判断是否被上下文支持。"""
+    # 第1步：把答案拆成一句句独立断言
+    decomp = _ask(client, (
+        "把以下答案拆成一句句独立的事实断言，每句一行，只输出断言本身，"
+        "不要编号、不要解释。\n\n答案：\n" + answer
+    ))
+    claims = [c.strip() for c in decomp.split("\n")
+              if c.strip() and not c.strip().startswith(("#", "-", "*", "1.", "2.", "3."))]
+    if not claims:
         return 0.0
+    # 第2步：逐句判断是否被上下文支持
+    supported = 0
+    for claim in claims:
+        verdict = _ask(client, (
+            "判断以下断言是否被上下文支持。只回答「是」或「否」。\n\n"
+            f"断言：{claim}\n\n上下文：\n{context}"
+        ))
+        if verdict.strip().lower().startswith(("是", "yes", "y", "true", "支持")):
+            supported += 1
+    return supported / len(claims)
 
 
 def context_precision(client, question: str, context: str) -> float:
@@ -59,14 +69,24 @@ def context_precision(client, question: str, context: str) -> float:
 
 
 def context_recall(client, question: str, context: str, ground_truth: str) -> float:
-    prompt = (
-        "给定问题、检索到的上下文、以及标准答案，判断上下文覆盖了标准答案多少比例的信息（召回）。\n\n"
-        f"问题：{question}\n\n上下文：\n{context}\n\n标准答案：{ground_truth}\n\n只输出一个 0~1 的小数。"
-    )
-    try:
-        return float(_ask(client, prompt))
-    except ValueError:
+    """RAGAS 细粒度 context recall：拆标准答案成信息点 → 逐点判断能否从上下文找到依据。"""
+    decomp = _ask(client, (
+        "把以下标准答案拆成一句句独立的信息点，每句一行，只输出信息点本身，"
+        "不要编号、不要解释。\n\n标准答案：\n" + ground_truth
+    ))
+    points = [p.strip() for p in decomp.split("\n")
+              if p.strip() and not p.strip().startswith(("#", "-", "*", "1.", "2.", "3."))]
+    if not points:
         return 0.0
+    attributed = 0
+    for p in points:
+        verdict = _ask(client, (
+            "以下信息点能否从上下文中找到依据？只回答「是」或「否」。\n\n"
+            f"信息点：{p}\n\n上下文：\n{context}"
+        ))
+        if verdict.strip().lower().startswith(("是", "yes", "y", "true", "支持")):
+            attributed += 1
+    return attributed / len(points)
 
 
 def main(index_dir: str = "data/index", n: int = 30) -> None:
