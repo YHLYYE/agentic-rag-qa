@@ -25,4 +25,4 @@ def test_merge_and_rerank_dedups():
     merged = merge_and_rerank([r1, r2], top_k=3)
     ids = [m.chunk.chunk_id for m in merged]
     assert len(ids) == len(set(ids))  # dedup
-    assert ids[0] == "a"  # highest score first
+    assert ids[0] == "b"  # b appears in both lists → highest fused (RRF) rank

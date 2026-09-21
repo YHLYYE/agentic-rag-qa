@@ -1,4 +1,6 @@
 import hashlib
+import re
+
 from models import Chunk
 
 
@@ -29,3 +31,21 @@ def chunk_text(text: str, source_doc: str, section: str, page: int,
         ))
         idx += 1
     return chunks
+
+
+_HEADING_RE = re.compile(
+    r'(ITEM\s+\d+[A-Z]?\.?|PART\s+[IVX]+|Consolidated\s+(Balance|Statements?|Statement)|Notes\s+to\s+Consolidated)',
+    re.IGNORECASE,
+)
+
+
+def detect_heading(text: str) -> str | None:
+    """Return the first 10-K section heading found in a page, or None."""
+    for line in text.split("\n"):
+        s = line.strip()
+        if not s or len(s) > 120:
+            continue
+        m = _HEADING_RE.search(s)
+        if m:
+            return m.group(0).strip()
+    return None

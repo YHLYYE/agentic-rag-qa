@@ -10,6 +10,7 @@ class Embedder:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vecs = self._model.encode(
-            texts, normalize_embeddings=self.normalize, show_progress_bar=False
+            texts, normalize_embeddings=self.normalize,
+            show_progress_bar=True, batch_size=16
         )
         return [v.tolist() for v in vecs]

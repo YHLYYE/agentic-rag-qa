@@ -1,4 +1,5 @@
 import faiss
+import numpy as np
 
 from models import Chunk, RetrievedChunk
 from rag.embeddings import Embedder
@@ -11,7 +12,7 @@ class DenseRetriever:
         self._index = faiss.read_index(index_path)
 
     def retrieve(self, query: str, top_k: int = 8) -> list[RetrievedChunk]:
-        q = self.embedder.embed([query])[0]
+        q = np.array([self.embedder.embed([query])[0]], dtype="float32")
         scores, ids = self._index.search(q, top_k)
         out = []
         for score, idx in zip(scores[0], ids[0]):
