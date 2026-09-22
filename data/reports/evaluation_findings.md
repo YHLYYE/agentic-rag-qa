@@ -67,14 +67,28 @@ AgenticRAG-QA：自纠错 + 路由的 Agentic RAG 问答系统，基于 FinanceB
 
 ---
 
-## 4. 修复方案（待做）
+## 4. 修复结果（find_tables 部分有效，未完全解决）
 
-**用 `find_tables()` 替代 `get_text()` 结构化抽表格。**
+**已做**：`find_tables()` 结构化抽表 + 重建索引 + 重跑评估。
 
-步骤：
-1. 重写 `src/ingest/parse.py`：`extract_pages` → `extract_tables`（`page.find_tables()` 抽取行列单元格，保留「字段名 + 值」结构）
-2. 重新抽取 63 份 PDF → 切块 → bge-m3 建索引（约 30-50 分钟）
-3. 重新跑 RAGAS 评估，对比修复前后 context_precision/recall
+**结果**：
+- ✅ 数字分开了：`157713731420` → `$ 1,577 $1,373 $1,420`
+- ❌ 但「1,577」仍未和列名「资本支出」对应 → recall 仍 ~0.11
+
+**进一步验证（pdfplumber 也无效）**：
+- pdfplumber 抽同一页，结果和 find_tables 一模一样（数字分开、无列名映射）
+- FinanceBench 官方自己的抽取也是乱的（`(1,577)` 带括号、和列名分离）
+
+**最终结论：财报表格的「多行表头 + 数据」是本质难题，换库解决不了。**
+
+**可靠的最终指标（拆句法）**：
+- faithfulness 0.441（拆句法更严格可信）
+- context_precision 0.107
+- context_recall 0.111（真实反映语料难度，非系统缺陷）
+
+**可选方向（待用户定）**：
+1. 接受现状，诚实记录「财报表格是本质难题」
+2. 换更简单的语料（纯叙述文本）以提升 recall
 
 ---
 
