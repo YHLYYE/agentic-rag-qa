@@ -33,7 +33,14 @@ def _route_by_llm(question: str, llm) -> str:
 
 
 def route_node(state: AgenticRAGState, llm=None) -> dict:
-    q = state["question"]
+    q = state["question"].strip()
+    # 简单歧义检测：问题太短（< 3 词）→ 需要澄清
+    if len(q.split()) < 3:
+        return {
+            "intent": "semantic",
+            "needs_clarify": True,
+            "route_decision": {"semantic_intent": "ambiguous", "strategy": "semantic", "source": "rule"},
+        }
     if llm is not None:
         semantic = _route_by_llm(q, llm)
         strategy = _INTENT_MAP.get(semantic, "semantic")
@@ -44,8 +51,16 @@ def route_node(state: AgenticRAGState, llm=None) -> dict:
         source = "rule"
     return {
         "intent": strategy,
+        "needs_clarify": False,
         "route_decision": {"semantic_intent": semantic, "strategy": strategy, "source": source},
     }
+
+
+def clarify_node(state: AgenticRAGState) -> dict:
+    """interrupt() 人工澄清：暂停等用户补充信息，恢复后回到 route 重新路由。"""
+    from langgraph.types import interrupt
+    clarification = interrupt({"clarification": "请澄清你的问题（补充缺失信息）"})
+    return {"question": clarification, "needs_clarify": False, "clarification": clarification}
 
 
 def verify_node(state: AgenticRAGState) -> dict:

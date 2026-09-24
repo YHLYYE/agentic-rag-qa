@@ -12,3 +12,5 @@ class AgenticRAGState(TypedDict):
     grounding_verdict: str
     final_answer: str
     retry_count: int
+    needs_clarify: bool
+    clarification: str
