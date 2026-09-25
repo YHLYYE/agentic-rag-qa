@@ -1,0 +1,215 @@
+"""端到端跑一次完整的 LangGraph 五节点链路（唯一的人可运行入口）。
+
+链路：route(LLM 意图路由) -> retrieve(多路检索) -> critique(检索批判)
+      -> generate(生成候选答案+引用) -> verify(引用硬闸门) -> END / 回退重查
+
+用法（在仓库根目录）：
+
+    # 有 DeepSeek key（.env 或环境变量）-> 走完整的 LLM 意图路由
+    $env:PYTHONPATH="src"; $env:HF_ENDPOINT="https://hf-mirror.com"
+    python -m run_graph "谁发明了电话？"
+
+    # 离线跑完整链路：不调任何模型接口，用抽取式占位模型代替生成
+    python -m run_graph "谁发明了电话？" --no-llm
+
+    # 排障：打印完整 state
+    python -m run_graph "谁发明了电话？" --json
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+# 让 `python src/run_graph.py` 与 `python -m run_graph` 都能找到 src 下的模块
+_SRC_DIR = Path(__file__).resolve().parent
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
+from graph.build import build_graph
+
+DEFAULT_INDEX_DIR = "data/qa/index"
+DEFAULT_EMBED_MODEL = "BAAI/bge-m3"
+DEFAULT_EMBED_DIM = 1024
+
+# 生成 prompt 里每个上下文片段形如 "[chunk_id] 正文"
+_CONTEXT_LINE = re.compile(r"^\[([a-f0-9]+)\]\s*(.+)$", re.MULTILINE)
+
+
+class ExtractiveLLM:
+    """离线占位模型：不调任何接口，把上下文第一段当答案并附上真实引用。
+
+    用途：没有 API key 时也能把五节点链路（含引用硬闸门）完整跑一遍。
+    它不是生成质量方案——`--no-llm` 演示出来的答案就是原文片段。
+    """
+
+    def complete(self, prompt: str) -> str:
+        if "只输出类别名" in prompt:      # 路由 prompt：交回规则兜底
+            return "factoid"
+        m = _CONTEXT_LINE.search(prompt)
+        if not m:
+            return "查不到"
+        chunk_id, text = m.group(1), m.group(2).strip()
+        return f"{text[:300]} {{{{{chunk_id}}}}}"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="run_graph",
+        description="跑一次完整的 Agentic RAG 图链路并打印每个节点的状态",
+    )
+    p.add_argument("question", help="要问的问题")
+    p.add_argument("--index-dir", default=DEFAULT_INDEX_DIR,
+                   help=f"索引目录（默认 {DEFAULT_INDEX_DIR}）")
+    p.add_argument("--max-retry", type=int, default=2,
+                   help="回退重查上限（默认 2）")
+    p.add_argument("--no-llm", action="store_true",
+                   help="离线模式：不调任何模型接口，用抽取式占位模型跑完整条图")
+    p.add_argument("--json", action="store_true", help="打印完整 state（JSON）")
+    return p
+
+
+def initial_state(question: str) -> dict:
+    """图的初始 state：字段与 AgenticRAGState 一一对应，缺一个节点就会读不到。"""
+    return {
+        "question": question,
+        "intent": "",
+        "route_decision": {},
+        "retrieved_chunks": [],
+        "retrieval_verdict": "",
+        "candidate_answer": "",
+        "citations": [],
+        "grounding_verdict": "",
+        "final_answer": "",
+        "retry_count": 0,
+        "needs_clarify": False,
+        "clarification": "",
+    }
+
+
+def run(question: str, retrievers: dict, llm=None, max_retry: int = 2) -> dict:
+    """构建图并跑一次完整链路，返回最终 state。"""
+    graph = build_graph(retrievers, llm, max_retry=max_retry)
+    return graph.invoke(initial_state(question))
+
+
+def format_trace(state: dict) -> list[str]:
+    """把最终 state 渲染成「每个节点发生了什么」的可读追踪。"""
+    route = state.get("route_decision") or {}
+    chunks = state.get("retrieved_chunks") or []
+    citations = state.get("citations") or []
+    answer = state.get("candidate_answer") or ""
+
+    lines = [
+        f"[1] 路由       intent={state.get('intent')!r} "
+        f"semantic_intent={route.get('semantic_intent')!r} "
+        f"source={route.get('source')!r} "
+        f"needs_clarify={state.get('needs_clarify')}",
+        f"[2] 检索       命中 {len(chunks)} 个 chunk  "
+        f"retry_count={state.get('retry_count')}",
+    ]
+    for i, c in enumerate(chunks[:5], 1):
+        score = c.get("score")
+        score_text = f"{score:.4f}" if isinstance(score, (int, float)) else str(score)
+        snippet = (c.get("text") or "")[:60].replace("\n", " ")
+        lines.append(f"      #{i} {c.get('chunk_id')} score={score_text} {snippet}...")
+    if len(chunks) > 5:
+        lines.append(f"      ...（共 {len(chunks)} 个）")
+
+    lines += [
+        f"[3] 检索批判   retrieval_verdict={state.get('retrieval_verdict')!r}",
+        f"[4] 生成       候选答案 {len(answer)} 字，"
+        f"引用 {len(citations)} 个 chunk_id: {citations}",
+        f"[5] 引用校验   grounding_verdict={state.get('grounding_verdict')!r}",
+        "",
+        f"最终答案：{state.get('final_answer')}",
+    ]
+    return lines
+
+
+def load_retrievers(index_dir: str = DEFAULT_INDEX_DIR,
+                    embed_model: str = DEFAULT_EMBED_MODEL,
+                    embed_dim: int = DEFAULT_EMBED_DIM,
+                    device: str | None = "cpu") -> dict:
+    """加载离线索引 + 两个检索器，返回 {name: retrieve_fn} 供图使用。"""
+    import pickle
+
+    from rag.bm25 import BM25Retriever
+    from rag.dense import DenseRetriever
+    from rag.embeddings import Embedder
+
+    index_path = Path(index_dir)
+    with open(index_path / "chunks.pkl", "rb") as f:
+        chunks = pickle.load(f)
+    # 关掉进度条：它写 stderr，会让 PowerShell 把演示输出标成 NativeCommandError
+    embedder = Embedder(model_name=embed_model, dim=embed_dim, device=device,
+                        show_progress=False)
+    dense = DenseRetriever(chunks, embedder, str(index_path / "faiss.index"))
+    bm25 = BM25Retriever(chunks)
+    return {"dense": dense.retrieve, "bm25": bm25.retrieve}
+
+
+class DeepSeekLLM:
+    """OpenAI 兼容客户端；temperature=0 与全部评估脚本保持一致。"""
+
+    def __init__(self, client, model: str | None = None):
+        self.client = client
+        self.model = model or os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+
+    def complete(self, prompt: str) -> str:
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        return resp.choices[0].message.content.strip()
+
+
+def build_llm() -> DeepSeekLLM:
+    from dotenv import load_dotenv
+    from openai import OpenAI
+
+    load_dotenv()
+    client = OpenAI(
+        base_url=os.environ["DEEPSEEK_BASE_URL"],
+        api_key=os.environ["DEEPSEEK_API_KEY"],
+    )
+    return DeepSeekLLM(client)
+
+
+def main(argv: list[str] | None = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
+    args = build_parser().parse_args(argv)
+    llm = ExtractiveLLM() if args.no_llm else build_llm()
+
+    print(f"问题：{args.question}")
+    print(f"配置：index_dir={args.index_dir}  max_retry={args.max_retry}  "
+          f"模型={'离线抽取式占位（--no-llm）' if args.no_llm else 'DeepSeek API'}")
+    print("加载检索器 ...", flush=True)
+    retrievers = load_retrievers(args.index_dir)
+
+    state = run(args.question, retrievers, llm, max_retry=args.max_retry)
+
+    print("\n=== 链路追踪 ===")
+    if "__interrupt__" in state:
+        print("[!] 问题过于模糊，图已在 clarify 节点暂停（interrupt）。")
+        print(f"    澄清请求：{state['__interrupt__']}")
+        print("    补充信息后重跑即可；恢复需要 checkpointer + Command(resume=...)。")
+        return 0
+    for line in format_trace(state):
+        print(line)
+
+    if args.json:
+        print("\n=== 完整 state ===")
+        print(json.dumps(state, ensure_ascii=False, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
