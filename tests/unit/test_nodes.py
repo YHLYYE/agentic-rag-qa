@@ -94,3 +94,72 @@ def test_route_node_llm_multihop_maps_to_hybrid():
 def test_route_node_ambiguous_short_question():
     out = route_node({"question": "who?"})
     assert out["needs_clarify"] is True
+
+
+# --- 回归：回退重查必须推进状态（否则回退环无界且无效）---
+
+def test_retrieve_node_increments_retry_count():
+    chunks = [Chunk("a", "revenue grew", "d", "s", 1)]
+    retrievers = {"dense": lambda q, k: [RetrievedChunk(chunks[0], 0.9)],
+                  "bm25": lambda q, k: [RetrievedChunk(chunks[0], 0.5)]}
+    out = retrieve_node({"question": "revenue", "intent": "semantic",
+                         "retrieved_chunks": [], "retry_count": 0}, retrievers)
+    assert out.get("retry_count") == 1
+
+
+def test_retrieve_node_escalates_to_hybrid_on_retry():
+    """回退时若沿用同一策略+同一 query，会拿到完全相同的 chunks（原地打转）。"""
+    chunks = [Chunk("a", "revenue grew", "d", "s", 1)]
+    seen = []
+
+    def dense(q, k):
+        seen.append(("dense", k))
+        return [RetrievedChunk(chunks[0], 0.9)]
+
+    def bm25(q, k):
+        seen.append(("bm25", k))
+        return [RetrievedChunk(chunks[0], 0.5)]
+
+    retrievers = {"dense": dense, "bm25": bm25}
+    first = retrieve_node({"question": "revenue", "intent": "semantic",
+                           "retrieved_chunks": [], "retry_count": 0}, retrievers)
+    assert [name for name, _ in seen] == ["dense"]  # 首轮：按路由走单路
+
+    seen.clear()
+    retry = retrieve_node({"question": "revenue", "intent": "semantic",
+                           "retrieved_chunks": first["retrieved_chunks"],
+                           "retry_count": first["retry_count"]}, retrievers)
+    assert [name for name, _ in seen] == ["dense", "bm25"]  # 回退：换混合双路
+    assert retry["retry_count"] == 2
+
+
+# --- 回归：verify 必须落地 final_answer（成功定稿 / 超限降级）---
+
+def test_verify_node_writes_final_answer_when_supported():
+    state = {"candidate_answer": "revenue grew {{abc123}}",
+             "citations": ["abc123"],
+             "retrieved_chunks": [{"chunk_id": "abc123"}],
+             "retry_count": 0}
+    out = verify_node(state)
+    assert out["grounding_verdict"] == "supported"
+    assert out.get("final_answer") == "revenue grew {{abc123}}"
+
+
+def test_verify_node_degrades_when_retries_exhausted():
+    state = {"candidate_answer": "revenue grew {{deadbeef}}",
+             "citations": ["deadbeef"],
+             "retrieved_chunks": [{"chunk_id": "abc123"}],
+             "retry_count": 2}  # 默认上限 2，已耗尽
+    out = verify_node(state)
+    assert out["grounding_verdict"] == "unsupported"
+    assert out.get("final_answer")  # 不能留空、更不能抛异常
+
+
+def test_verify_node_does_not_finalize_while_retries_remain():
+    state = {"candidate_answer": "revenue grew {{deadbeef}}",
+             "citations": ["deadbeef"],
+             "retrieved_chunks": [{"chunk_id": "abc123"}],
+             "retry_count": 0}
+    out = verify_node(state)
+    assert out["grounding_verdict"] == "unsupported"
+    assert not out.get("final_answer")  # 还有重试机会，交给回退环再查

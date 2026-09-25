@@ -34,8 +34,8 @@ def _route_by_llm(question: str, llm) -> str:
 
 def route_node(state: AgenticRAGState, llm=None) -> dict:
     q = state["question"].strip()
-    # 简单歧义检测：问题太短（< 3 词）→ 需要澄清
-    if len(q.split()) < 3:
+    # 简单歧义检测：去掉空格后 < 5 个字符（中英文通用，如 "who?" / "谁？"）→ 需要澄清
+    if len(q.replace(" ", "")) < 5:
         return {
             "intent": "semantic",
             "needs_clarify": True,
@@ -63,29 +63,42 @@ def clarify_node(state: AgenticRAGState) -> dict:
     return {"question": clarification, "needs_clarify": False, "clarification": clarification}
 
 
-def verify_node(state: AgenticRAGState) -> dict:
+_DEGRADED_ANSWER = (
+    "抱歉，我没有在知识库中找到足以支撑该结论的资料（已重试 {n} 次）。"
+    "请补充问题信息，或直接查阅原始文档。"
+)
+
+
+def verify_node(state: AgenticRAGState, max_retry: int = 2) -> dict:
     retrieved_ids = {rc.get("chunk_id") for rc in state["retrieved_chunks"]}
     cits = state.get("citations", [])
-    if not cits:
-        return {"grounding_verdict": "unsupported"}
-    supported = all(c in retrieved_ids for c in cits)
-    return {"grounding_verdict": "supported" if supported else "unsupported"}
+    if cits and all(c in retrieved_ids for c in cits):
+        return {"grounding_verdict": "supported",
+                "final_answer": state.get("candidate_answer", "")}
+    if state.get("retry_count", 0) >= max_retry:
+        # 重试已耗尽：降级为「查不到」，而不是留空或抛异常
+        return {"grounding_verdict": "unsupported",
+                "final_answer": _DEGRADED_ANSWER.format(n=max_retry)}
+    return {"grounding_verdict": "unsupported"}
 
 
 def retrieve_node(state: AgenticRAGState, retrievers: dict) -> dict:
     from rag.hybrid import merge_and_rerank
     q = state["question"]
-    intent = state["intent"]
+    attempt = state.get("retry_count", 0)
+    # 回退重查必须改变检索行为：沿用原策略+同一 query 会拿到完全相同的 chunks（原地打转）
+    intent = "hybrid" if attempt > 0 else state["intent"]
+    top_k = 8 if attempt == 0 else 12
     if intent == "hybrid":
-        lists = [r(q, 8) for r in retrievers.values()]
-        merged = merge_and_rerank(lists, top_k=8)
+        lists = [r(q, top_k) for r in retrievers.values()]
+        merged = merge_and_rerank(lists, top_k=top_k)
     elif intent == "keyword":
-        merged = retrievers["bm25"](q, 8)
+        merged = retrievers["bm25"](q, top_k)
     else:
-        merged = retrievers["dense"](q, 8)
+        merged = retrievers["dense"](q, top_k)
     out = [{"chunk_id": rc.chunk.chunk_id, "text": rc.chunk.text, "score": rc.score}
            for rc in merged]
-    return {"retrieved_chunks": out}
+    return {"retrieved_chunks": out, "retry_count": attempt + 1}
 
 
 def critique_node(state: AgenticRAGState) -> dict:
