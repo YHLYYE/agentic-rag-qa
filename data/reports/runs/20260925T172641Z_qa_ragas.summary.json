@@ -1,0 +1,44 @@
+{
+  "name": "qa_ragas",
+  "timestamp_utc": "20260925T172641Z",
+  "git_rev": "4c7853d",
+  "n": 30,
+  "summary": {
+    "n": 30,
+    "sampling": {
+      "mode": "stratified",
+      "per_type": 10
+    },
+    "types_covered": [
+      "comparison",
+      "factoid",
+      "multi-hop"
+    ],
+    "overall": {
+      "faithfulness": 0.8555555555555555,
+      "context_precision": 0.2066666666666667,
+      "context_recall": 0.8333333333333334
+    },
+    "per_type": {
+      "factoid": {
+        "faithfulness": 0.7666666666666666,
+        "context_precision": 0.14000000000000004,
+        "context_recall": 0.8,
+        "n": 10
+      },
+      "comparison": {
+        "faithfulness": 0.8,
+        "context_precision": 0.29000000000000004,
+        "context_recall": 0.9,
+        "n": 10
+      },
+      "multi-hop": {
+        "faithfulness": 1.0,
+        "context_precision": 0.19,
+        "context_recall": 0.8,
+        "n": 10
+      }
+    }
+  },
+  "detail_file": "20260925T172641Z_qa_ragas.jsonl"
+}

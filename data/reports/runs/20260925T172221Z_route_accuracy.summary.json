@@ -1,0 +1,35 @@
+{
+  "name": "route_accuracy",
+  "timestamp_utc": "20260925T172221Z",
+  "git_rev": "4c7853d",
+  "n": 30,
+  "summary": {
+    "accuracy": 0.8333333333333334,
+    "correct": 25,
+    "total": 30,
+    "sampling": {
+      "mode": "stratified",
+      "per_type": 10
+    },
+    "types_covered": [
+      "comparison",
+      "factoid",
+      "multi-hop"
+    ],
+    "per_class_accuracy": {
+      "comparison": 1.0,
+      "factoid": 0.7,
+      "multi-hop": 0.8
+    },
+    "per_class_support": {
+      "comparison": 10,
+      "factoid": 10,
+      "multi-hop": 10
+    },
+    "confusion": {
+      "factoid->multi-hop": 3,
+      "multi-hop->factoid": 2
+    }
+  },
+  "detail_file": "20260925T172221Z_route_accuracy.jsonl"
+}

@@ -1,0 +1,30 @@
+{"question": "Which opera has more acts, La jolie fille de Perth or Mitridate, re di Ponto?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which composer was a French Romantic composer in the 1800's, Hector Berlioz or Gaetano Donizetti?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "What American filmmaker was the co-founder of Troma Entertainment film studio, Stanley Lloyd Kaufman, Jr. or Jay T. Wright?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "which plant has the highest specie  Panicum or Populus ", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which facility was founded in Missouri, Discovery Zone or Valentino's?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Does MedStar Washington Hospital Center or Children's National Medical Center have more beds?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which film was released first: Sacred Planet or Oz the Great and Powerful?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which of the following has released ten solo albums: Kristin Hersh or Mike Patton?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Are Centaurium and Dacrydium both genuses of plant species?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "What kind of beverage does Planter's Punch and Black Velvet have in common?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "What is the traditional technical term for a road/paving granite block, alternatively called a Belgian block, and incorrectly a cobble or cobblestone?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "Speculation towards the end of 2007 suggested that Rupert Murdoch's News International Group was in discussion to buy what significant business networking website?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "What is the most abundant substance in the plant kingdom, which no mammal produces the enzyme to digest?", "gold": "factoid", "predicted": "multi-hop", "strategy": "hybrid", "correct": false}
+{"question": "What was the name of the female that politician John Profumo had an affair with which ended his political career in 1963?", "gold": "factoid", "predicted": "multi-hop", "strategy": "hybrid", "correct": false}
+{"question": "Barra island, Outer Hebrides, has at 2012 the world's only official beach-based what?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "Football World Cup venue Soccer City is in which city?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "How were Dr Stantz, Dr Spengler and Dr Venkman better known in the 1980's?", "gold": "factoid", "predicted": "multi-hop", "strategy": "hybrid", "correct": false}
+{"question": "Which country is known as The Hashemite Kingdom?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "It was announced in April 2007 that Lord Justice Scott Baker would replace Baroness Butler-Sloss in what position?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "The official Astronomical length of a ('Julian') year is how many days?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "What Mexican actress of film, television, and theatre was a protagonist in La Heredera?", "gold": "multi-hop", "predicted": "factoid", "strategy": "keyword", "correct": false}
+{"question": "Grown-Ups starred the actor who was best known for which role on  \"'Allo 'Allo!\"?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "Li Yitong made her television debut on which network?", "gold": "multi-hop", "predicted": "factoid", "strategy": "keyword", "correct": false}
+{"question": "Ross Pople worked with this French dominant figure of the post-war classical music world.", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "How many students were enrolled in American professional bowler Chris Barnes' high school in the 2010-2011 school year?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "Nick Jr Too was launched on the same day as what rival channel that was created by Turner Broadcasting, and is the sister station of Cartoon Network?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "The Experts stars what actor known for \"Saturday Night Fever\" and \"Grease\"?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "What was the name of the commander who captured all of the French ships that varied in size?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "George Reed was, along with which Drake University player, one of the greatest running backs in CFL history?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "Where is the home of the common party princess voiced by Idina Menzel?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}

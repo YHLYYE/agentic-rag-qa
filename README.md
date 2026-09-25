@@ -71,6 +71,9 @@ streamlit run src/ui/app.py
 
 ## 评估结果
 
+> ⚠️ **下方这组 n=300 的数字目前没有原始记录**（早期跑完只打印到终端，未落盘），引用前请看 [`data/reports/评估存档说明.md`](data/reports/评估存档说明.md)。
+> 有存档支撑的是 2026-09-26 实跑的 **n=30 分层抽样**：路由准确率 **0.833（25/30）**、faithfulness 0.856 / precision 0.207 / recall 0.833，逐题明细在 `data/reports/runs/`。
+
 | 指标 | 值 |
 |------|-----|
 | 路由准确率 | 84.3%（300 题，三类分流） |
@@ -79,6 +82,8 @@ streamlit run src/ui/app.py
 | precision | 0.232 |
 
 分题型：factoid recall 0.840 / comparison 0.690 / multi-hop 0.810。
+
+复现：`python -m eval.route_accuracy --per-type 10`、`python -m eval.run_qa_eval --per-type 10`（每次都落盘到 `data/reports/runs/`）。
 
 ## 目录结构
 
