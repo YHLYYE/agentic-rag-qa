@@ -1,0 +1,44 @@
+{
+  "name": "retrieval_hybrid_k5",
+  "timestamp_utc": "20260925T181718Z",
+  "git_rev": "138cf52",
+  "n": 300,
+  "summary": {
+    "k": 5,
+    "n": 300,
+    "hit_rate@k": 0.85,
+    "mrr": 0.6683333333333333,
+    "answer_ratio@k": 0.3886666666666669,
+    "miss_count": 45,
+    "first_hit_rank": {
+      "1": 167,
+      "2": 41,
+      "3": 21,
+      "4": 16,
+      "5": 10
+    },
+    "per_type": {
+      "comparison": {
+        "n": 100,
+        "hit_rate@k": 0.82,
+        "mrr": 0.6485000000000001,
+        "answer_ratio@k": 0.3299999999999998
+      },
+      "factoid": {
+        "n": 100,
+        "hit_rate@k": 0.91,
+        "mrr": 0.7778333333333332,
+        "answer_ratio@k": 0.5639999999999998
+      },
+      "multi-hop": {
+        "n": 100,
+        "hit_rate@k": 0.82,
+        "mrr": 0.5786666666666669,
+        "answer_ratio@k": 0.2719999999999997
+      }
+    },
+    "retriever": "hybrid",
+    "index_dir": "data/qa/index"
+  },
+  "detail_file": "20260925T181718Z_retrieval_hybrid_k5.jsonl"
+}

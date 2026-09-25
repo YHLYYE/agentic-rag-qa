@@ -1,0 +1,44 @@
+{
+  "name": "retrieval_dense_k5",
+  "timestamp_utc": "20260925T181600Z",
+  "git_rev": "138cf52",
+  "n": 300,
+  "summary": {
+    "k": 5,
+    "n": 300,
+    "hit_rate@k": 0.8466666666666667,
+    "mrr": 0.6949444444444444,
+    "answer_ratio@k": 0.40266666666666695,
+    "miss_count": 46,
+    "first_hit_rank": {
+      "1": 176,
+      "2": 47,
+      "3": 16,
+      "4": 13,
+      "5": 2
+    },
+    "per_type": {
+      "comparison": {
+        "n": 100,
+        "hit_rate@k": 0.82,
+        "mrr": 0.6661666666666668,
+        "answer_ratio@k": 0.33999999999999986
+      },
+      "factoid": {
+        "n": 100,
+        "hit_rate@k": 0.89,
+        "mrr": 0.7941666666666666,
+        "answer_ratio@k": 0.5919999999999999
+      },
+      "multi-hop": {
+        "n": 100,
+        "hit_rate@k": 0.83,
+        "mrr": 0.6245,
+        "answer_ratio@k": 0.27599999999999975
+      }
+    },
+    "retriever": "dense",
+    "index_dir": "data/qa/index"
+  },
+  "detail_file": "20260925T181600Z_retrieval_dense_k5.jsonl"
+}

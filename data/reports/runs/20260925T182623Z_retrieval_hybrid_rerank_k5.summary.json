@@ -1,0 +1,45 @@
+{
+  "name": "retrieval_hybrid_rerank_k5",
+  "timestamp_utc": "20260925T182623Z",
+  "git_rev": "138cf52",
+  "n": 300,
+  "summary": {
+    "k": 5,
+    "n": 300,
+    "hit_rate@k": 0.87,
+    "mrr": 0.7020555555555555,
+    "answer_ratio@k": 0.4300000000000004,
+    "miss_count": 39,
+    "first_hit_rank": {
+      "1": 168,
+      "2": 73,
+      "3": 14,
+      "4": 5,
+      "5": 1
+    },
+    "per_type": {
+      "comparison": {
+        "n": 100,
+        "hit_rate@k": 0.83,
+        "mrr": 0.6586666666666667,
+        "answer_ratio@k": 0.3479999999999999
+      },
+      "factoid": {
+        "n": 100,
+        "hit_rate@k": 0.9,
+        "mrr": 0.8225,
+        "answer_ratio@k": 0.6499999999999997
+      },
+      "multi-hop": {
+        "n": 100,
+        "hit_rate@k": 0.88,
+        "mrr": 0.6250000000000001,
+        "answer_ratio@k": 0.2919999999999997
+      }
+    },
+    "retriever": "hybrid_rerank",
+    "recall_source": "data/qa/hybrid_candidates.pkl",
+    "cache": "data/qa/hybrid_candidates.pkl"
+  },
+  "detail_file": "20260925T182623Z_retrieval_hybrid_rerank_k5.jsonl"
+}
