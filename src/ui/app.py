@@ -37,7 +37,7 @@ class LLM:
 def load_retrievers(index_dir="data/qa/index"):
     with open(Path(index_dir) / "chunks.pkl", "rb") as f:
         chunks = pickle.load(f)
-    embedder = Embedder(model_name="BAAI/bge-m3", dim=1024)
+    embedder = Embedder(model_name="BAAI/bge-m3", dim=1024, device="cpu")
     dense = DenseRetriever(chunks, embedder, str(Path(index_dir) / "faiss.index"))
     bm25 = BM25Retriever(chunks)
     return chunks, dense, bm25
