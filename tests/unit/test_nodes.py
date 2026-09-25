@@ -64,3 +64,33 @@ def test_generate_node_produces_citations():
     out = generate_node(state, llm=_FakeLLM())
     assert "{{a}}" in out["candidate_answer"]
     assert out["citations"] == ["a"]
+
+
+class _FakeRouteLLM:
+    def __init__(self, intent: str):
+        self.intent = intent
+
+    def complete(self, prompt: str) -> str:
+        return self.intent
+
+
+def test_route_node_llm_factoid_maps_to_keyword():
+    out = route_node({"question": "who invented the telephone"}, llm=_FakeRouteLLM("factoid"))
+    assert out["intent"] == "keyword"
+    assert out["route_decision"]["semantic_intent"] == "factoid"
+    assert out["needs_clarify"] is False
+
+
+def test_route_node_llm_comparison_maps_to_semantic():
+    out = route_node({"question": "compare A and B"}, llm=_FakeRouteLLM("comparison"))
+    assert out["intent"] == "semantic"
+
+
+def test_route_node_llm_multihop_maps_to_hybrid():
+    out = route_node({"question": "who directed the movie A starred in"}, llm=_FakeRouteLLM("multi-hop"))
+    assert out["intent"] == "hybrid"
+
+
+def test_route_node_ambiguous_short_question():
+    out = route_node({"question": "who?"})
+    assert out["needs_clarify"] is True
