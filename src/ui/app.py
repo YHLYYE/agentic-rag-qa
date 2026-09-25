@@ -18,19 +18,7 @@ from rag.dense import DenseRetriever
 from rag.bm25 import BM25Retriever
 from rag.hybrid import merge_and_rerank
 from graph.nodes import route_node
-
-
-class LLM:
-    def __init__(self, client: OpenAI):
-        self.client = client
-
-    def complete(self, prompt: str) -> str:
-        r = self.client.chat.completions.create(
-            model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        return r.choices[0].message.content.strip()
+from llm import DeepSeekLLM
 
 
 @st.cache_resource
@@ -47,7 +35,7 @@ def load_retrievers(index_dir="data/qa/index"):
 def load_llm():
     load_dotenv()
     client = OpenAI(base_url=os.environ["DEEPSEEK_BASE_URL"], api_key=os.environ["DEEPSEEK_API_KEY"])
-    return LLM(client)
+    return DeepSeekLLM(client)
 
 
 _STRATEGY_LABEL = {

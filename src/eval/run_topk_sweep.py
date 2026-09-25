@@ -11,19 +11,7 @@ from rag.bm25 import BM25Retriever
 from rag.hybrid import merge_and_rerank
 from graph.nodes import route_node
 from eval.ragas_self import context_precision, context_recall
-
-
-class LLM:
-    def __init__(self, client: OpenAI):
-        self.client = client
-
-    def complete(self, prompt: str) -> str:
-        r = self.client.chat.completions.create(
-            model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        return r.choices[0].message.content.strip()
+from llm import DeepSeekLLM
 
 
 def _retrieve(q, strategy, dense, bm25, k):
@@ -37,7 +25,7 @@ def _retrieve(q, strategy, dense, bm25, k):
 def main(n: int = 60) -> None:
     load_dotenv()
     client = OpenAI(base_url=os.environ["DEEPSEEK_BASE_URL"], api_key=os.environ["DEEPSEEK_API_KEY"])
-    llm = LLM(client)
+    llm = DeepSeekLLM(client)
 
     with open("data/qa/eval_set.pkl", "rb") as f:
         eval_set = pickle.load(f)[:n]

@@ -44,10 +44,10 @@
 
 以下重复是真实存在的，属于"可以合并但还没合并"：
 
-1. `LLM` 包装类在 `run_qa_eval.py` / `run_topk_sweep.py` / `run_topk_sweep_fast.py` / `ui/app.py` 各写了一遍（`run_graph.py` 里是 `DeepSeekLLM`），可抽成 `eval/llm.py`。
-2. `_retrieve` 在 `run_topk_sweep*.py` 各一份；`_ask` 在 `ragas_self.py` 与其他脚本各一份。
+1. ✅ **已合并（2026-09-26）**：`LLM` 包装类原先在 `run_qa_eval.py` / `run_qa_rerank.py` / `run_topk_sweep.py` / `run_topk_sweep_fast.py` / `ui/app.py` 各写一遍，现统一为 `src/llm.py` 的 `DeepSeekLLM`（有单测 `tests/unit/test_llm.py`）。
+2. `_retrieve` 在 `run_topk_sweep*.py` 各一份；`_ask` 在 `ragas_self.py` 与 `run_rerank_compare.py` 各一份；`load_retrievers` 在 `run_graph.py` 与 `ui/app.py` 各一份。**未合并**。
 
-3. `configs/config.yaml` + `src/config.py` **只被 `tests/unit/test_config.py` 使用**，运行时全是硬编码——要么接进 `run_graph`，要么删掉。
+3. `configs/config.yaml` + `src/config.py` **只被 `tests/unit/test_config.py` 使用**，运行时全是硬编码——要么接进 `run_graph`，要么删掉。**未决**。
 
 4. **CLI 参数解析不统一**：`route_accuracy.py` / `run_qa_eval.py` / `run_graph.py` 用 argparse（有 `--help`），而 `run_topk_sweep.py` / `run_topk_sweep_fast.py` / `run_qa_rerank.py` / `run_rerank_compare.py` / `run_eval.py` 直接用 `sys.argv`，所以 `--help` 会抛 `ValueError`。
    不影响正常调用（如 `python -m eval.run_topk_sweep 60`），属于待统一项。

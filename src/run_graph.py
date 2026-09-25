@@ -159,32 +159,8 @@ def load_retrievers(index_dir: str = DEFAULT_INDEX_DIR,
     return {"dense": dense.retrieve, "bm25": bm25.retrieve}
 
 
-class DeepSeekLLM:
-    """OpenAI 兼容客户端；temperature=0 与全部评估脚本保持一致。"""
-
-    def __init__(self, client, model: str | None = None):
-        self.client = client
-        self.model = model or os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
-
-    def complete(self, prompt: str) -> str:
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        return resp.choices[0].message.content.strip()
-
-
-def build_llm() -> DeepSeekLLM:
-    from dotenv import load_dotenv
-    from openai import OpenAI
-
-    load_dotenv()
-    client = OpenAI(
-        base_url=os.environ["DEEPSEEK_BASE_URL"],
-        api_key=os.environ["DEEPSEEK_API_KEY"],
-    )
-    return DeepSeekLLM(client)
+# LLM 包装统一在 src/llm.py（原先 5 处各写了一份）；这里再导出一次，保持 `run_graph.DeepSeekLLM` 可用
+from llm import DeepSeekLLM, build_llm  # noqa: E402  (需在 sys.path 处理之后导入)
 
 
 def main(argv: list[str] | None = None) -> int:
