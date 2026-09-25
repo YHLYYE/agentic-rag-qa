@@ -1,0 +1,44 @@
+{
+  "name": "retrieval_bm25_k5",
+  "timestamp_utc": "20260925T185825Z",
+  "git_rev": "500ba8a",
+  "n": 300,
+  "summary": {
+    "k": 5,
+    "n": 300,
+    "hit_rate@k": 0.79,
+    "mrr": 0.6407777777777776,
+    "answer_ratio@k": 0.3853333333333335,
+    "miss_count": 63,
+    "first_hit_rank": {
+      "1": 161,
+      "2": 45,
+      "3": 16,
+      "4": 8,
+      "5": 7
+    },
+    "per_type": {
+      "comparison": {
+        "n": 100,
+        "hit_rate@k": 0.76,
+        "mrr": 0.6131666666666667,
+        "answer_ratio@k": 0.3319999999999999
+      },
+      "factoid": {
+        "n": 100,
+        "hit_rate@k": 0.89,
+        "mrr": 0.7931666666666668,
+        "answer_ratio@k": 0.5740000000000001
+      },
+      "multi-hop": {
+        "n": 100,
+        "hit_rate@k": 0.72,
+        "mrr": 0.516,
+        "answer_ratio@k": 0.24999999999999975
+      }
+    },
+    "retriever": "bm25",
+    "index_dir": "data/qa/index"
+  },
+  "detail_file": "20260925T185825Z_retrieval_bm25_k5.jsonl"
+}

@@ -2,7 +2,20 @@ from graph.state import AgenticRAGState
 from rag.citation import parse_citations
 
 
-# 语义意图 → 检索策略 的映射
+# 语义意图 → 检索策略 的映射。
+#
+# 2026-09-26 数据复核记录（n=300，HitRate@5）：
+#   曾一度认为「factoid → BM25」是负收益（当时实测 bm25 0.720，三类都弱于 dense），
+#   并据此把它改成统一走 hybrid。**该结论已撤回** —— 根因不是路由设计，而是
+#   BM25 的分词实现有缺陷（text.split()：大小写敏感 + 不剥离标点）。
+#
+#   修复分词后（src/rag/bm25.py 的 simple_tokenize / tokenize_no_stopwords）：
+#       bm25  0.720 → 0.790（小写+去标点）→ 0.803（再去停用词）
+#     factoid 上 0.800 → 0.900，与 dense（0.890）持平，
+#     即原映射「查事实/数字走词面匹配」的前提**成立**。
+#
+#   保留三类分流的另一层意义是延迟：BM25 不需要 embedding，
+#   factoid（占 1/3 查询）走 BM25 可以省掉这部分开销，代价约 0.7pt。
 _INTENT_MAP = {
     "factoid": "keyword",     # 查事实/数字 → BM25 关键词
     "comparison": "semantic", # 对比 → dense 语义

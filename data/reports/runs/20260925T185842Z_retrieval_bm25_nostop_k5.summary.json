@@ -1,0 +1,44 @@
+{
+  "name": "retrieval_bm25_nostop_k5",
+  "timestamp_utc": "20260925T185842Z",
+  "git_rev": "500ba8a",
+  "n": 300,
+  "summary": {
+    "k": 5,
+    "n": 300,
+    "hit_rate@k": 0.8033333333333333,
+    "mrr": 0.6508333333333333,
+    "answer_ratio@k": 0.384666666666667,
+    "miss_count": 59,
+    "first_hit_rank": {
+      "1": 162,
+      "2": 49,
+      "3": 18,
+      "4": 7,
+      "5": 5
+    },
+    "per_type": {
+      "comparison": {
+        "n": 100,
+        "hit_rate@k": 0.75,
+        "mrr": 0.6036666666666668,
+        "answer_ratio@k": 0.32999999999999985
+      },
+      "factoid": {
+        "n": 100,
+        "hit_rate@k": 0.9,
+        "mrr": 0.8023333333333335,
+        "answer_ratio@k": 0.5819999999999999
+      },
+      "multi-hop": {
+        "n": 100,
+        "hit_rate@k": 0.76,
+        "mrr": 0.5465000000000001,
+        "answer_ratio@k": 0.24199999999999972
+      }
+    },
+    "retriever": "bm25_nostop",
+    "index_dir": "data/qa/index"
+  },
+  "detail_file": "20260925T185842Z_retrieval_bm25_nostop_k5.jsonl"
+}

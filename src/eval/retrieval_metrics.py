@@ -97,7 +97,7 @@ def load_chunks(index_dir: str = "data/qa/index"):
 
 
 def build_retriever(kind: str, index_dir: str = "data/qa/index", device: str = "cpu"):
-    """kind: dense | bm25 | hybrid | hybrid_rerank。"""
+    """kind: dense | bm25 | bm25_split | bm25_nostop | hybrid | hybrid_rerank。"""
     from rag.bm25 import BM25Retriever
     from rag.dense import DenseRetriever
     from rag.embeddings import Embedder
@@ -105,8 +105,14 @@ def build_retriever(kind: str, index_dir: str = "data/qa/index", device: str = "
 
     index_path = Path(index_dir)
     chunks = load_chunks(index_dir)
-    bm25 = BM25Retriever(chunks)
-    if kind == "bm25":
+    if kind == "bm25_split":                      # 旧的缺陷实现（大小写/标点敏感）
+        bm25 = BM25Retriever(chunks, tokenize=lambda t: (t or "").split())
+    elif kind == "bm25_nostop":
+        from rag.bm25 import tokenize_no_stopwords
+        bm25 = BM25Retriever(chunks, tokenize=tokenize_no_stopwords)
+    else:
+        bm25 = BM25Retriever(chunks)              # 默认 simple_tokenize
+    if kind in ("bm25", "bm25_split", "bm25_nostop"):
         return lambda q, k: bm25.retrieve(q, k)
     embedder = Embedder(model_name="BAAI/bge-m3", dim=1024, device=device,
                         show_progress=False)
@@ -161,7 +167,8 @@ def main(retriever: str = "dense", k: int = 5, per_type: int | None = None,
 def _parse_args(argv=None):
     p = argparse.ArgumentParser(description="确定性检索指标（无需 LLM）")
     p.add_argument("--retriever", default="dense",
-                   choices=["dense", "bm25", "hybrid", "hybrid_rerank"])
+                   choices=["dense", "bm25", "bm25_split", "bm25_nostop",
+                            "hybrid", "hybrid_rerank"])
     p.add_argument("--k", type=int, default=5)
     p.add_argument("--per-type", type=int, default=None)
     p.add_argument("--limit", type=int, default=None)
