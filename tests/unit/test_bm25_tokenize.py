@@ -28,6 +28,16 @@ def test_no_stopwords_variant():
     assert tokenize_no_stopwords("the quick brown fox") == ["quick", "brown", "fox"]
 
 
+def test_stopword_only_query_does_not_become_empty():
+    """全是停用词时不能让 token 列表变空，否则 BM25 打分退化成全 0、排序随机。"""
+    assert tokenize_no_stopwords("Who is it?") == ["who", "is", "it"]
+
+
+def test_default_tokenizer_is_the_no_stopwords_variant():
+    chunks = [Chunk("a", "text", "d", "s", 1)]
+    assert BM25Retriever(chunks).tokenize is tokenize_no_stopwords
+
+
 def test_retriever_matches_despite_case_and_punctuation():
     """这是回归测试：老实现下 'WHO'/'TELEPHONE?' 匹配不上任何东西。"""
     chunks = [Chunk("a", "The Telephone was invented by Alexander Graham Bell", "d", "s", 1),
