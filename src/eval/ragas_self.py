@@ -89,6 +89,41 @@ def context_recall(client, question: str, context: str, ground_truth: str) -> fl
     return attributed / len(points)
 
 
+_YES_TOKENS = ("是", "对的", "对", "正确", "yes", "true")
+_NO_TOKENS = ("否", "不是", "不正确", "错误", "no", "false")
+
+
+def _parse_yes_no(text: str) -> float | None:
+    """1.0 / 0.0；无法判定返回 None。
+
+    顺序要紧：'不是' 里含 '是'，先判否定才不会把否定读成肯定。
+    """
+    t = (text or "").strip().lower()
+    if any(t.startswith(k) for k in _NO_TOKENS):
+        return 0.0
+    if any(t.startswith(k) for k in _YES_TOKENS):
+        return 1.0
+    return None
+
+
+def answer_correctness(client, question: str, answer: str, ground_truth: str) -> dict:
+    """端到端答案正确率：对照标准答案判「答案对不对」。
+
+    返回 {'score': 1.0 | 0.0 | None, 'raw': 判官原始输出}。
+
+    score=None 表示判官输出**无法解析**——明确区分「判不出来」和「答错了」，
+    不重蹈 context_precision 静默记 0 的覆辙（那会让指标被系统性低估，
+    而且事后无法审计）。
+    """
+    raw = _ask(client, (
+        "判断「答案」是否正确回答了「问题」。以「标准答案」为准，"
+        "只看信息是否一致，措辞不同不算错。只回答「是」或「否」。\n\n"
+        f"问题：{question}\n\n标准答案：{ground_truth}\n\n答案：{answer}\n\n"
+        "是否正确？"
+    ))
+    return {"score": _parse_yes_no(raw), "raw": raw}
+
+
 def main(index_dir: str = "data/index", n: int = 30) -> None:
     with open(Path(index_dir) / "chunks.pkl", "rb") as f:
         chunks = pickle.load(f)

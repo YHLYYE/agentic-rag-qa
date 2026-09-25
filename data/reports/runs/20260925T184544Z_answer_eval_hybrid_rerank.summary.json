@@ -1,0 +1,43 @@
+{
+  "name": "answer_eval_hybrid_rerank",
+  "timestamp_utc": "20260925T184544Z",
+  "git_rev": "59b3e8e",
+  "n": 30,
+  "summary": {
+    "n": 30,
+    "answer_correctness": 0.9666666666666667,
+    "answer_correctness_parse_failures": 0,
+    "faithfulness": 0.9333333333333333,
+    "context_precision": 0.2116666666666667,
+    "context_recall": 0.9333333333333333,
+    "per_type": {
+      "comparison": {
+        "n": 10,
+        "answer_correctness": 0.9,
+        "answer_correctness_parse_failures": 0,
+        "faithfulness": 0.9,
+        "context_precision": 0.23000000000000004,
+        "context_recall": 0.9
+      },
+      "factoid": {
+        "n": 10,
+        "answer_correctness": 1.0,
+        "answer_correctness_parse_failures": 0,
+        "faithfulness": 0.9,
+        "context_precision": 0.16499999999999998,
+        "context_recall": 0.9
+      },
+      "multi-hop": {
+        "n": 10,
+        "answer_correctness": 1.0,
+        "answer_correctness_parse_failures": 0,
+        "faithfulness": 1.0,
+        "context_precision": 0.24,
+        "context_recall": 1.0
+      }
+    },
+    "retriever": "hybrid_rerank",
+    "cache": "data/qa/hybrid_candidates_k50.pkl"
+  },
+  "detail_file": "20260925T184544Z_answer_eval_hybrid_rerank.jsonl"
+}
