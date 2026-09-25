@@ -1,7 +1,13 @@
 """Streamlit 演示界面：问 → 路由(LLM意图分类) → 检索 → 带引用回答。"""
 import os
+import sys
 import pickle
 from pathlib import Path
+
+# 让 `streamlit run src/ui/app.py` 无需手动设 PYTHONPATH 就能导入 src 下的模块
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# 国内走 hf-mirror 镜像，避免连 huggingface.co 卡住
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 import streamlit as st
 from dotenv import load_dotenv
