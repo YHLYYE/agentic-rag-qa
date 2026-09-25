@@ -95,3 +95,22 @@ def test_offline_mode_runs_the_whole_graph_without_an_api_key():
     state = run_graph.run("did revenue grow?", _retrievers(), run_graph.ExtractiveLLM())
     assert state["grounding_verdict"] == "supported"
     assert state["final_answer"]
+
+
+# --- 拒答路径要在追踪里如实显示，不能假装「生成过」---
+
+class _NoEvidenceLLM:
+    def complete(self, prompt: str) -> str:
+        if "只输出类别名" in prompt:
+            return "factoid"
+        if "检索质量评估" in prompt:
+            return "incorrect"
+        raise AssertionError("检索判定不可用时不应调用生成")
+
+
+def test_trace_marks_that_generation_was_skipped_on_refusal():
+    state = run_graph.run("who invented the telephone?", _retrievers(), _NoEvidenceLLM())
+    assert state["grounding_verdict"] == "unsupported"
+    text = "\n".join(run_graph.format_trace(state))
+    assert "未调用" in text
+    assert "知识库里没有检索到" in text

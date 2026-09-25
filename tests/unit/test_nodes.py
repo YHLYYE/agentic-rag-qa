@@ -34,7 +34,7 @@ def test_verify_node_unsupported():
 
 
 from models import Chunk, RetrievedChunk
-from graph.nodes import retrieve_node, generate_node, critique_node
+from graph.nodes import retrieve_node, generate_node, critique_node, give_up_node
 
 
 class _FakeLLM:
@@ -157,9 +157,60 @@ def test_verify_node_degrades_when_retries_exhausted():
 
 def test_verify_node_does_not_finalize_while_retries_remain():
     state = {"candidate_answer": "revenue grew {{deadbeef}}",
-             "citations": ["deadbeef"],
-             "retrieved_chunks": [{"chunk_id": "abc123"}],
-             "retry_count": 0}
+            "citations": ["deadbeef"],
+            "retrieved_chunks": [{"chunk_id": "abc123"}],
+            "retry_count": 0}
     out = verify_node(state)
     assert out["grounding_verdict"] == "unsupported"
     assert not out.get("final_answer")  # 还有重试机会，交给回退环再查
+
+
+# --- CRAG：检索评估器必须真的判相关性，而不是「非空即 correct」---
+
+class _VerdictLLM:
+    def __init__(self, verdict: str):
+        self.verdict = verdict
+
+    def complete(self, prompt: str) -> str:
+        return self.verdict
+
+
+def _critique_state(*scores):
+    return {"question": "did revenue grow?",
+            "retrieved_chunks": [{"chunk_id": f"c{i}", "text": "some text", "score": s}
+                                 for i, s in enumerate(scores)]}
+
+
+def test_critique_marks_incorrect_when_nothing_retrieved():
+    assert critique_node({"question": "q", "retrieved_chunks": []})["retrieval_verdict"] == "incorrect"
+
+
+def test_critique_uses_llm_judge_verdict():
+    for verdict in ("correct", "ambiguous", "incorrect"):
+        out = critique_node(_critique_state(0.9), llm=_VerdictLLM(verdict))
+        assert out["retrieval_verdict"] == verdict
+
+
+def test_critique_reads_incorrect_before_correct():
+    # "incorrect" 里包含子串 "correct"，解析顺序错了就会把不相关判成相关
+    out = critique_node(_critique_state(0.9), llm=_VerdictLLM("Incorrect."))
+    assert out["retrieval_verdict"] == "incorrect"
+
+
+def test_critique_without_judge_never_claims_correct():
+    """检索分数不能当相关性判据（BM25 小语料下真实命中也会是 0 分）。"""
+    assert critique_node(_critique_state(0.9))["retrieval_verdict"] == "ambiguous"
+    assert critique_node(_critique_state(0.0))["retrieval_verdict"] == "ambiguous"
+    assert critique_node(_critique_state())["retrieval_verdict"] == "incorrect"
+
+
+def test_critique_falls_back_when_llm_output_is_not_a_verdict():
+    out = critique_node(_critique_state(0.9), llm=_VerdictLLM("我觉得还行"))
+    assert out["retrieval_verdict"] == "ambiguous"   # 解析失败也不冒充 correct
+
+
+def test_give_up_node_refuses_instead_of_answering():
+    out = give_up_node({"question": "q", "retry_count": 2, "retrieved_chunks": []})
+    assert out["grounding_verdict"] == "unsupported"
+    assert out["final_answer"]
+    assert out["citations"] == []

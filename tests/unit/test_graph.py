@@ -75,7 +75,7 @@ def test_graph_honors_max_retry_param():
 # --- 回归：图必须真的用上 LLM 路由（否则 84.3% 的路由能力在演示里是死代码）---
 
 class _RouterAndAnswerLLM:
-    """路由 prompt → 返回指定类别；生成 prompt → 返回带真实引用的答案。"""
+    """路由 prompt → 指定类别；检索评估 prompt → correct；生成 prompt → 带真实引用的答案。"""
 
     def __init__(self, semantic_intent: str = "multi-hop"):
         self.semantic_intent = semantic_intent
@@ -83,6 +83,8 @@ class _RouterAndAnswerLLM:
     def complete(self, prompt: str) -> str:
         if "只输出类别名" in prompt:
             return self.semantic_intent
+        if "检索质量评估" in prompt:
+            return "correct"
         return "Revenue grew 20% {{a}}"
 
 
@@ -105,3 +107,51 @@ def test_graph_uses_llm_router_when_llm_provided():
     assert out["intent"] == "hybrid"                     # multi-hop → 混合检索
     assert seen == ["dense", "bm25"]                     # 且真的双路都调了
     assert out["grounding_verdict"] == "supported"
+
+
+# --- 回归：检索判定不可用时，图必须拒答，而不是让 LLM 硬答 ---
+
+class _VerdictRouterLLM:
+    """路由 prompt → factoid；检索评估 prompt → 指定 verdict；生成 prompt → 记录并回答。"""
+
+    def __init__(self, verdict: str):
+        self.verdict = verdict
+        self.generate_prompts = []
+
+    def complete(self, prompt: str) -> str:
+        if "只输出类别名" in prompt:
+            return "factoid"
+        if "检索质量评估" in prompt:
+            return self.verdict
+        self.generate_prompts.append(prompt)
+        return "Revenue grew 20% {{a}}"
+
+
+def _perfect_retrievers():
+    from models import Chunk, RetrievedChunk
+    chunks = [Chunk("a", "revenue grew 20%", "d", "s", 1)]
+    return {"dense": lambda q, k: [RetrievedChunk(chunks[0], 0.9)],
+            "bm25": lambda q, k: [RetrievedChunk(chunks[0], 0.9)]}
+
+
+def test_graph_refuses_to_answer_when_retrieval_is_incorrect():
+    llm = _VerdictRouterLLM("incorrect")
+    g = build_graph(_perfect_retrievers(), llm, max_retry=2)
+    out = g.invoke(_initial_state())
+
+    assert out["retrieval_verdict"] == "incorrect"
+    assert out["grounding_verdict"] == "unsupported"
+    assert out["final_answer"]                      # 明确拒答，不是空手而归
+    assert not llm.generate_prompts                 # 关键：压根没让 LLM 生成答案
+
+
+def test_graph_still_answers_when_retrieval_is_ambiguous():
+    """ambiguous 是「证据不足但可能相关」，允许带着引用硬闸门尽力作答。"""
+    llm = _VerdictRouterLLM("ambiguous")
+    g = build_graph(_perfect_retrievers(), llm, max_retry=2)
+    out = g.invoke(_initial_state())
+
+    assert out["retrieval_verdict"] == "ambiguous"
+    assert llm.generate_prompts                     # 尝试过作答
+    assert out["grounding_verdict"] == "supported"
+    assert out["final_answer"] == "Revenue grew 20% {{a}}"

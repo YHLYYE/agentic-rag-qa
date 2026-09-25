@@ -101,11 +101,68 @@ def retrieve_node(state: AgenticRAGState, retrievers: dict) -> dict:
     return {"retrieved_chunks": out, "retry_count": attempt + 1}
 
 
-def critique_node(state: AgenticRAGState) -> dict:
-    chunks = state["retrieved_chunks"]
+_CRAG_PROMPT = (
+    "你在做检索质量评估（CRAG）。判断下面这些资料对回答问题的有用程度。\n"
+    "只输出一个判定词：correct / ambiguous / incorrect\n"
+    "- correct：至少有 1 段资料能直接回答问题\n"
+    "- ambiguous：有部分相关信息，但不足以给出确定答案\n"
+    "- incorrect：全部与问题无关\n\n"
+    "问题：{question}\n\n资料：\n{context}\n\n判定："
+)
+
+_NO_EVIDENCE_ANSWER = (
+    "抱歉，知识库里没有检索到能回答这个问题的资料。"
+    "请换一种问法，或确认该问题是否在当前知识库范围内。"
+)
+
+
+def _parse_verdict(text: str) -> str | None:
+    """顺序要紧：'incorrect' 里含子串 'correct'，先判它才不会把不相关读成相关。"""
+    t = (text or "").strip().lower()
+    for verdict in ("incorrect", "ambiguous", "correct"):
+        if verdict in t:
+            return verdict
+    return None
+
+
+def _verdict_without_judge(chunks: list) -> str:
+    """没有 LLM 判官时的保守兜底：只区分「什么都没查到」和「有候选但相关性未知」。
+
+    不能拿检索分数当判据：分数尺度依赖检索器（BM25 无界、cosine 0~1），
+    而且 BM25 在语料极小时 IDF 会退化成 0，连真实命中都算出 0 分（实测）。
+    所以这里不敢说 correct，最多说 ambiguous。
+    """
+    return "ambiguous" if chunks else "incorrect"
+
+
+def critique_node(state: AgenticRAGState, llm=None) -> dict:
+    """CRAG 检索自纠错：判断检索到的资料能不能支撑作答。
+
+    correct → 直接进入生成；ambiguous / incorrect → 触发回退重查。
+    不传 llm 时退化为确定性分数兜底（仅识别明确零命中，不做语义判断）。
+    """
+    chunks = state.get("retrieved_chunks") or []
     if not chunks:
         return {"retrieval_verdict": "incorrect"}
-    return {"retrieval_verdict": "correct"}
+    if llm is None:
+        return {"retrieval_verdict": _verdict_without_judge(chunks)}
+
+    context = "\n".join(
+        f"[{c.get('chunk_id')}] {(c.get('text') or '')[:400]}" for c in chunks
+    )
+    resp = llm.complete(_CRAG_PROMPT.format(question=state["question"], context=context))
+    # 判官输出解析不出来时退回保守兜底，绝不默认放行
+    return {"retrieval_verdict": _parse_verdict(resp) or _verdict_without_judge(chunks)}
+
+
+def give_up_node(state: AgenticRAGState) -> dict:
+    """检索判定不可用且重试耗尽：明确拒答，不进入生成（不给幻觉留机会）。"""
+    return {
+        "candidate_answer": "",
+        "citations": [],
+        "grounding_verdict": "unsupported",
+        "final_answer": _NO_EVIDENCE_ANSWER,
+    }
 
 
 def generate_node(state: AgenticRAGState, llm) -> dict:

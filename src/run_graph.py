@@ -119,10 +119,17 @@ def format_trace(state: dict) -> list[str]:
     if len(chunks) > 5:
         lines.append(f"      ...（共 {len(chunks)} 个）")
 
+    # 拒答路径：检索判定不可用 → 图直接跳过了生成节点，别假装生成过
+    skipped_generate = not answer and not citations
+    if skipped_generate:
+        gen_line = "[4] 生成       未调用（检索判定不可用 → 直接拒答，不给幻觉留机会）"
+    else:
+        gen_line = (f"[4] 生成       候选答案 {len(answer)} 字，"
+                    f"引用 {len(citations)} 个 chunk_id: {citations}")
+
     lines += [
         f"[3] 检索批判   retrieval_verdict={state.get('retrieval_verdict')!r}",
-        f"[4] 生成       候选答案 {len(answer)} 字，"
-        f"引用 {len(citations)} 个 chunk_id: {citations}",
+        gen_line,
         f"[5] 引用校验   grounding_verdict={state.get('grounding_verdict')!r}",
         "",
         f"最终答案：{state.get('final_answer')}",
