@@ -1,0 +1,15 @@
+{"question": "Which opera has more acts, La jolie fille de Perth or Mitridate, re di Ponto?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which composer was a French Romantic composer in the 1800's, Hector Berlioz or Gaetano Donizetti?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "What American filmmaker was the co-founder of Troma Entertainment film studio, Stanley Lloyd Kaufman, Jr. or Jay T. Wright?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "which plant has the highest specie  Panicum or Populus ", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "Which facility was founded in Missouri, Discovery Zone or Valentino's?", "gold": "comparison", "predicted": "comparison", "strategy": "semantic", "correct": true}
+{"question": "What is the traditional technical term for a road/paving granite block, alternatively called a Belgian block, and incorrectly a cobble or cobblestone?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "Speculation towards the end of 2007 suggested that Rupert Murdoch's News International Group was in discussion to buy what significant business networking website?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "What is the most abundant substance in the plant kingdom, which no mammal produces the enzyme to digest?", "gold": "factoid", "predicted": "multi-hop", "strategy": "hybrid", "correct": false}
+{"question": "What was the name of the female that politician John Profumo had an affair with which ended his political career in 1963?", "gold": "factoid", "predicted": "multi-hop", "strategy": "hybrid", "correct": false}
+{"question": "Barra island, Outer Hebrides, has at 2012 the world's only official beach-based what?", "gold": "factoid", "predicted": "factoid", "strategy": "keyword", "correct": true}
+{"question": "What Mexican actress of film, television, and theatre was a protagonist in La Heredera?", "gold": "multi-hop", "predicted": "factoid", "strategy": "keyword", "correct": false}
+{"question": "Grown-Ups starred the actor who was best known for which role on  \"'Allo 'Allo!\"?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "Li Yitong made her television debut on which network?", "gold": "multi-hop", "predicted": "factoid", "strategy": "keyword", "correct": false}
+{"question": "Ross Pople worked with this French dominant figure of the post-war classical music world.", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
+{"question": "How many students were enrolled in American professional bowler Chris Barnes' high school in the 2010-2011 school year?", "gold": "multi-hop", "predicted": "multi-hop", "strategy": "hybrid", "correct": true}
