@@ -60,6 +60,18 @@ HF_ENDPOINT=https://hf-mirror.com PYTHONPATH=src python -m eval.run_qa_eval 300
 streamlit run src/ui/app.py
 ```
 
+非技术演示（一键启动）：**双击仓库根目录的 `启动页面.bat`**（自动 cd 到项目 + 用 raggpu 环境起服务）。
+
+演示问题示例（界面目前加载英文索引 `data/qa/index`）：
+
+```
+Which facility was founded in Missouri, Discovery Zone or Valentino's?     → Discovery Zone
+Which opera has more acts, La jolie fille de Perth or Mitridate, re di Ponto?  → 四幕 vs 三幕
+Who invented the telephone?   → 应回答「查不到」（不在语料里），可演示引用硬闸门与拒答
+```
+
+> 界面目前只接了英文轨道；要演示中文轨道需改用 `data/zh/T2Ranking/` 的语料（见 `data/reports/中文检索轨道-T2Ranking.md`）。
+
 ---
 
 ## 架构

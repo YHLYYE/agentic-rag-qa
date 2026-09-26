@@ -117,6 +117,12 @@ AgenticRAG-QA：自纠错 + 路由的 Agentic RAG 问答系统，基于 FinanceB
   - bge-reranker-base 手动下载到 `data/models/bge-reranker-base/`（huggingface-hub 的 HEAD 请求被 hf-mirror 拒，改用 httpx GET 手动下）
 - **网络**：huggingface.co 被墙，一律走 `hf-mirror.com`；v2rayN 关掉后系统代理(7890)会死，需关系统代理(ProxyEnable=0)否则连国内 DeepSeek 也会卡
 - **运行环境变量**：所有 Python 脚本加 `HF_ENDPOINT=https://hf-mirror.com`（或 `HF_HUB_OFFLINE=1`），否则 SentenceTransformer 加载会去连 huggingface.co 卡住
+- **hf-mirror 的 URL 前缀规则（反复踩）**：
+  - **数据集**走 `/datasets/` 前缀：`https://hf-mirror.com/api/datasets/<repo>`、`https://hf-mirror.com/datasets/<repo>/resolve/main/<file>`
+  - **模型**没有前缀：`https://hf-mirror.com/api/models/<repo>`、`https://hf-mirror.com/<repo>/resolve/main/<file>`
+  - 前缀写错会得到 **404**（不是明确报错，容易误判成"数据集不存在"）
+- **大模型/数据集走 httpx 流式下载**：`huggingface_hub` 的 HEAD 请求会被 hf-mirror 拒；
+  实测 httpx 直连下载速度约 **21 MB/s**（3.4GB 语料 2.7 分钟、2.2GB 模型 2.5 分钟）
 
 ---
 
