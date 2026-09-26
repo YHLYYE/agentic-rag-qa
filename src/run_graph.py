@@ -115,6 +115,7 @@ def initial_state(question: str, history: list | None = None) -> dict:
     """
     return {
         "question": question,
+        "original_question": question,
         "history": list(history or []),
         "rewritten": False,
         "intent": "",
@@ -186,7 +187,12 @@ def format_trace(state: dict) -> list[str]:
     citations = state.get("citations") or []
     answer = state.get("candidate_answer") or ""
 
-    lines = [
+    lines = []
+    # 多轮改写可观测性：把「改写前 → 改写后」打在追踪最前面，失败时才分得清是改写还是检索的问题
+    if state.get("rewritten"):
+        lines.append(f"[0] 改写       {state.get('original_question')!r} → {state.get('question')!r}")
+
+    lines += [
         f"[1] 路由       intent={state.get('intent')!r} "
         f"semantic_intent={route.get('semantic_intent')!r} "
         f"source={route.get('source')!r} "

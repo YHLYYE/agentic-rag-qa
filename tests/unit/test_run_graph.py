@@ -190,3 +190,27 @@ def test_resume_without_checkpointer_raises_clear_error():
     g = _checkpointed_graph()
     with pytest.raises(ValueError):
         run_graph.resume("补充", g, thread_id=None)
+
+
+# --- ③ 可观测性：改写前后都要能看见，拒答要能归因 ---
+
+def test_trace_shows_rewrite_when_question_was_rewritten():
+    state = {"rewritten": True, "original_question": "它有几幕？",
+             "question": "La jolie fille de Perth 有几幕？",
+             "route_decision": {}, "retrieved_chunks": [], "citations": [],
+             "candidate_answer": "", "final_answer": ""}
+    text = "\n".join(run_graph.format_trace(state))
+    assert "[0] 改写" in text
+    assert "它有几幕？" in text and "La jolie fille de Perth 有几幕？" in text
+
+
+def test_trace_omits_rewrite_line_for_single_turn():
+    state = {"rewritten": False, "question": "q", "route_decision": {},
+             "retrieved_chunks": [], "citations": [], "candidate_answer": "",
+             "final_answer": ""}
+    text = "\n".join(run_graph.format_trace(state))
+    assert "[0] 改写" not in text
+
+
+def test_initial_state_records_original_question():
+    assert run_graph.initial_state("q")["original_question"] == "q"

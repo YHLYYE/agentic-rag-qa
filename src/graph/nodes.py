@@ -107,7 +107,8 @@ def rewrite_node(state: AgenticRAGState, llm=None) -> dict:
     rewritten = (llm.complete(prompt) or "").strip()
     if not rewritten:
         return {}          # 改写失败就沿用原问题 —— 不能把问题改没了
-    return {"question": rewritten, "rewritten": True}
+    return {"question": rewritten, "rewritten": True,
+            "original_question": state["question"]}   # 记下改写前的问题，便于归因
 
 
 _DEGRADED_ANSWER = (
@@ -214,11 +215,16 @@ def critique_node(state: AgenticRAGState, llm=None) -> dict:
 
 def give_up_node(state: AgenticRAGState) -> dict:
     """检索判定不可用且重试耗尽：明确拒答，不进入生成（不给幻觉留机会）。"""
+    # 可归因性：如果是改写后的 query 检不到，明确写出来 ——
+    # 否则「查不到」到底是语料没有、还是改写跑偏了，完全看不出来。
+    note = ""
+    if state.get("rewritten"):
+        note = f"（本轮检索使用的是改写后的问题：「{state.get('question', '')}」）"
     return {
         "candidate_answer": "",
         "citations": [],
         "grounding_verdict": "unsupported",
-        "final_answer": _NO_EVIDENCE_ANSWER,
+        "final_answer": _NO_EVIDENCE_ANSWER + note,
     }
 
 

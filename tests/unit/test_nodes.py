@@ -217,6 +217,18 @@ def test_give_up_node_refuses_instead_of_answering():
     assert out["citations"] == []
 
 
+def test_give_up_names_the_rewritten_query_for_attribution():
+    """改写后检不到时，拒答文案要写清用的是哪个 query —— 否则无法区分「语料没有」和「改写跑偏」。"""
+    out = give_up_node({"question": "它有几幕？", "retry_count": 2,
+                        "retrieved_chunks": [], "rewritten": True})
+    assert "它有几幕？" in out["final_answer"]
+
+
+def test_give_up_stays_clean_for_single_turn():
+    out = give_up_node({"question": "q", "retry_count": 2, "retrieved_chunks": []})
+    assert "改写" not in out["final_answer"]
+
+
 # --- 多轮对话：指代消解（改写 query 去检索）+ 历史只进生成 prompt ---
 
 class _BoomLLM:
