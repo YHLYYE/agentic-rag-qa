@@ -97,22 +97,33 @@ class AgenticRAGState(TypedDict):
 | `retrieve_node` | 执行多路检索，合并去重 + rerank | 普通函数（非 LLM） |
 | `critique_node` | CRAG：给检索结果打相关性分 | LLM |
 | `generate_node` | 生成候选答案 + 引用 | LLM |
-| `verify_node` | 逐条校验引用是否支撑结论；unsupported 时重查或降级「请查阅原文」 | LLM |
+| `verify_node` | **引用硬闸门**：校验引用 id 是否真在本次检索结果里（**确定性集合判断，不是 LLM**）；unsupported 时重查或降级 | 普通函数 |
+| `give_up_node` | 检索判定不可用且重试耗尽 → **明确拒答**，不进入生成（不给幻觉留机会） | 普通函数 |
 
 **条件边（控制流）**：
 
 ```
-route → retrieve                    （按意图选单路 or 扇出多路）
+route → retrieve                    （按意图选单路；回退时升级为多路）
 retrieve → critique                 （检索评估）
 critique → correct    → generate    （检索过关，进生成）
-critique → incorrect  → retrieve    （重查，retry_count 有界）
-critique → ambiguous  → retrieve    （合并重查，retry_count 有界）
+critique → incorrect / ambiguous，且 retry_count < max → retrieve（重查）
+critique → incorrect 且 retry 耗尽  → give_up → END（**拒答**）
+critique → ambiguous 且 retry 耗尽  → generate（带着引用硬闸门尽力作答）
 generate → verify                   （引用校验）
 verify → supported    → END         （定稿）
-verify → unsupported  → retrieve    （重查，有界）或 降级「请查阅原文」
+verify → unsupported 且 retry < max → retrieve（重查）
+verify → unsupported 且 retry 耗尽  → END（降级文案，由 verify_node 写入 final_answer）
 ```
 
-> 降级「请查阅原文」是 `verify_node` 的 `unsupported` 分支里的一个返回值，不单设节点。
+> **实现状态（与设计的两处差异，已在 2026-09-26 对齐）**：
+> 1. 原来 `retry_count` **从未自增** → 回退环无界（实测会烧 2501 次 LLM 调用）。现已由
+>    `retrieve_node` 推进计数、条件边用传入的 `max_retry` 拦截，**并保证状态真的推进**（回退时升级为 hybrid + 放宽候选集）。
+> 2. 原来「检索判定不可用」时仍会进生成 → LLM 硬答。现在改为 `give_up_node` **直接拒答**。
+> 回归测试：`tests/unit/test_graph.py::test_graph_bounded_when_citations_never_ground`。
+
+> **`verify_node` 的诚实边界**：它校验的是「引用 id 是否存在」**而非「引用是否真的支撑结论」**。
+> 前者是确定性判断、零成本零延迟，能挡掉「编造一个不存在的引用」这类最常见幻觉；
+> 后者需要 LLM 逐条判断（更贵），是明确的后续项。
 
 **LangGraph 能力覆盖**：
 
@@ -120,9 +131,13 @@ verify → unsupported  → retrieve    （重查，有界）或 降级「请查
 |----------------|------|
 | StateGraph + TypedDict | `AgenticRAGState` |
 | 条件边（路由） | `route_node` 多分支 |
-| 循环（有界重试） | `critique/verify → retrieve` 回退环 |
-| Send API 并行扇出 | 混合类问题多路检索并行 |
+| 循环（有界重试） | `critique/verify → retrieve` 回退环（状态推进 + `max_retry` 硬上限） |
+| 拒答分支 | `critique → give_up → END` |
 | interrupt() 人机协作（stretch） | 歧义问题多轮澄清 + checkpoint 恢复 |
+
+> ⚠️ **本文档早期版本声称「用 Send API 并行扇出多路检索」—— 这没有实现**（`rg "Send" src` 为 0 命中）。
+> 实际是顺序调用，`src/rag/pipeline.py` 里的 `HybridRerankRetriever` 也是顺序的。
+> 并行化是明确的后续优化项（见 `data/reports/优化进展-检索准确率.md` §4.4）。
 
 ### 4.3 路由（route_node）
 
@@ -222,6 +237,32 @@ verify_node → 引用支撑结论 → supported
 
 ## 7. 评估层
 
+### 7.0 四个评估装置（**按「有什么标注」分，不按语言分**）
+
+这是本项目评估设计的核心：**装置与语料解耦** —— 语料只需声明它有哪种标注，就接入对应装置。
+
+| 装置 | 文件 | 需要什么标注 | 回答什么问题 | 补充 |
+|---|---|---|---|---|
+| 对 qrels 的检索评估 | `eval/qrels_retrieval.py`、`eval/qrels_dense_eval.py` | 人工相关性标注 | 检索排序好不好（nDCG / Recall / MRR，支持分级相关度） | **指标最硬**，且能对官方基线逐项核对 |
+| 代理指标检索评估 | `eval/retrieval_metrics.py`、`eval/rerank_eval.py` | 标准答案（做字符串匹配） | 答案有没有被检索到（HitRate / MRR） | 有已知盲区（答案是 yes 的是非题测不出来） |
+| 端到端评估 | `eval/answer_eval.py` | **标准答案** | 答案对不对、忠实度、上下文召回 | 唯一能测「答案正确率」的装置 |
+| 生成侧 + 工程数据 | `eval/qrels_gen_latency.py` | 只要 query（**不需要答案**） | 忠实度、延迟基准 | faithfulness 不依赖 gold answer |
+
+**语料档案**（`run_graph.CORPORA`）一处声明三件事，入口用 `--corpus` 切换：
+
+```python
+CORPORA = {
+  "en_qa": {"index_dir": "data/qa/index",           "tokenizer": "en", "has_answers": True},
+  "zh_t2": {"index_dir": "data/zh/T2Ranking/index", "tokenizer": "zh", "has_answers": False},
+}
+```
+
+> **`tokenizer` 必须随语料走**：用错会让 BM25 那一路基本失效（实测 nDCG@10 差 **9.5 倍**）。
+> `has_answers` 决定界面是否提示「该语料不能报答案正确率」——避免误报假数字。
+
+所有装置的产物都经 `eval/artifacts.py` 落盘（逐题明细 + 汇总 + `git_rev`），
+**任何汇总数字都能追溯到原始记录**；`eval/sampling.py` 提供分层抽样（防止「取前缀 = 单题型」的假证据）。
+
 ### 7.1 指标
 
 | 指标 | 测什么 | 计算 |
@@ -265,14 +306,20 @@ agentic-rag-qa/
 ├── DESIGN.md                  # 本文档
 ├── README.md
 ├── src/
-│   ├── ingest/                # benchmark 文档下载、解析、切块、入库
-│   ├── rag/                   # 检索器（dense/BM25）、rerank、溯源
-│   ├── graph/                 # LangGraph 节点、状态、条件边
-│   └── eval/                  # MRR / RAGAS / 引用命中率 三组对照
+│   ├── ingest/                # 语料接入：下载、解析、切块、建索引、导出同构产物
+│   │                          #   含 build_qa_index（数据集②）/ build_zh_t2ranking（数据集①）
+│   │                          #   含 export_zh_index（统一问答入口的索引格式）
+│   ├── rag/                   # 检索组件：embeddings / dense / bm25（两套分词器）/
+│   │                          #   hybrid(RRF) / reranker / pipeline（统一重排）/ citation
+│   ├── graph/                 # LangGraph 节点、状态、条件边（含 give_up 拒答分支）
+│   ├── eval/                  # 评估装置（按能力分，见 §7）
+│   ├── llm.py                 # LLM 包装（统一 temperature / strip / 模型选择）
+│   ├── run_graph.py           # 端到端 CLI 入口（--corpus 切换数据集、--rerank 开精排）
+│   └── ui/app.py              # Streamlit 界面（复用同一套图链路）
 ├── tests/
 │   ├── unit/                  # 各节点单测
 │   └── e2e/                   # 端到端问答链路
-├── configs/                   # config.yaml（语料路径、模型、检索参数）
+├── configs/                   # config.yaml（⚠️ 见 §9 说明：目前未接入运行时）
 └── data/
     ├── raw/                   # benchmark 原始文件（gitignore）
     ├── index/                 # 切块 + 向量索引产物
