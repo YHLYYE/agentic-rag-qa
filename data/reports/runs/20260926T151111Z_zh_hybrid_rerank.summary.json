@@ -1,0 +1,21 @@
+{
+  "name": "zh_hybrid_rerank",
+  "timestamp_utc": "20260926T151111Z",
+  "git_rev": "3023a1d",
+  "n": 1000,
+  "summary": {
+    "n": 1000,
+    "ndcg@10": 0.6021440454506756,
+    "recall@10": 0.7157096257801681,
+    "mrr@10": 0.7748349206349214,
+    "ndcg@100": 0.6801816274441815,
+    "recall@100": 0.9542777981886347,
+    "mrr@100": 0.7758620561690333,
+    "retriever": "hybrid_rerank",
+    "corpus_size": 30365,
+    "topk": 100,
+    "dataset": "T2Ranking(dev subset)",
+    "metrics": "real qrels"
+  },
+  "detail_file": "20260926T151111Z_zh_hybrid_rerank.jsonl"
+}

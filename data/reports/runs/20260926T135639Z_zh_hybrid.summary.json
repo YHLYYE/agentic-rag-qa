@@ -1,0 +1,21 @@
+{
+  "name": "zh_hybrid",
+  "timestamp_utc": "20260926T135639Z",
+  "git_rev": "3023a1d",
+  "n": 1000,
+  "summary": {
+    "n": 1000,
+    "ndcg@10": 0.5618531808922961,
+    "recall@10": 0.6843734878613188,
+    "mrr@10": 0.7639531746031751,
+    "ndcg@100": 0.657925134193129,
+    "recall@100": 0.9542777981886347,
+    "mrr@100": 0.7646823831204275,
+    "retriever": "hybrid",
+    "corpus_size": 30365,
+    "topk": 100,
+    "dataset": "T2Ranking(dev subset)",
+    "metrics": "real qrels"
+  },
+  "detail_file": "20260926T135639Z_zh_hybrid.jsonl"
+}

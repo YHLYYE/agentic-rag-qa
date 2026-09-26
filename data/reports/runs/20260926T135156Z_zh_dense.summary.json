@@ -1,0 +1,21 @@
+{
+  "name": "zh_dense",
+  "timestamp_utc": "20260926T135156Z",
+  "git_rev": "3023a1d",
+  "n": 1000,
+  "summary": {
+    "n": 1000,
+    "ndcg@10": 0.5789191551162552,
+    "recall@10": 0.7035324928718772,
+    "mrr@10": 0.747450000000001,
+    "ndcg@100": 0.6632127688570745,
+    "recall@100": 0.9504329006749519,
+    "mrr@100": 0.7485475147711215,
+    "retriever": "dense",
+    "corpus_size": 30365,
+    "topk": 100,
+    "dataset": "T2Ranking(dev subset)",
+    "metrics": "real qrels"
+  },
+  "detail_file": "20260926T135156Z_zh_dense.jsonl"
+}

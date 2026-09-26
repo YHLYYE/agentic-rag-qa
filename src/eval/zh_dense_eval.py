@@ -17,6 +17,7 @@ from eval import artifacts, zh_retrieval as zr
 DEFAULT_DIR = "data/zh/T2Ranking"
 DEFAULT_PREFIX = "subset_q1000"
 SHARD = 2000          # 每 2000 段存一次分片
+RERANK_HEAD = 30      # 只重排候选头部（CrossEncoder 成本高，且头部决定 nDCG@10）
 
 
 def embed_cached(texts: list[str], cache_dir: str, prefix: str,
@@ -84,7 +85,8 @@ def build_dense_retriever(pids: list[str], texts: list[str], matrix_parts, index
 
 def main(directory: str = DEFAULT_DIR, prefix: str = DEFAULT_PREFIX,
          topk: int = 100, out_dir: str = artifacts.DEFAULT_OUT_DIR,
-         device: str | None = None, max_seq_length: int = 1024) -> dict:
+         device: str | None = None, max_seq_length: int = 1024,
+         rerank_model: str | None = None, only: str | None = None) -> dict:
     from rag.bm25 import BM25Retriever, zh_tokenize
     from rag.hybrid import merge_and_rerank
 
@@ -109,8 +111,11 @@ def main(directory: str = DEFAULT_DIR, prefix: str = DEFAULT_PREFIX,
 
     def run(name: str, fn) -> dict:
         print(f"检索中: {name} ...", flush=True)
-        rankings = {qid: [x.chunk.chunk_id for x in fn(text, topk)]
-                    for qid, text in queries.items()}
+        rankings = {}
+        for i, (qid, text) in enumerate(queries.items(), 1):
+            rankings[qid] = [x.chunk.chunk_id for x in fn(text, topk)]
+            if i % 200 == 0:
+                print(f"    {name}: {i}/{len(queries)}", flush=True)
         s = zr.evaluate_rankings(rankings, qrels, ks=(10, 100))
         s.update({"retriever": name, "corpus_size": len(pids), "topk": topk,
                   "dataset": "T2Ranking(dev subset)", "metrics": "real qrels"})
@@ -124,10 +129,25 @@ def main(directory: str = DEFAULT_DIR, prefix: str = DEFAULT_PREFIX,
         return s
 
     results = {}
-    results["dense"] = run("dense", lambda q, k: dense.retrieve(q, k))
-    results["bm25_zh"] = run("bm25_zh", lambda q, k: bm25.retrieve(q, k))
-    results["hybrid"] = run("hybrid", lambda q, k: merge_and_rerank(
-        [dense.retrieve(q, k), bm25.retrieve(q, k)], top_k=k))
+    if only != "hybrid_rerank":          # 已有存档的基线可以跳过，省时间
+        results["dense"] = run("dense", lambda q, k: dense.retrieve(q, k))
+        results["bm25_zh"] = run("bm25_zh", lambda q, k: bm25.retrieve(q, k))
+        results["hybrid"] = run("hybrid", lambda q, k: merge_and_rerank(
+            [dense.retrieve(q, k), bm25.retrieve(q, k)], top_k=k))
+
+    if rerank_model:
+        from rag.reranker import Reranker
+        print(f"加载重排模型 {rerank_model} (max_length=512, batch=32) ...", flush=True)
+        reranker = Reranker(rerank_model, max_length=512)
+
+        def _rerank(q: str, k: int):
+            # 粗排：hybrid 取 k 个候选 → 精排：只重排头部 RERANK_HEAD 个
+            # （尾部保持原序 —— 这样 Recall@100 与 hybrid 一致，重排的影响只体现在头部）
+            cands = merge_and_rerank([dense.retrieve(q, k), bm25.retrieve(q, k)], top_k=k)
+            head = reranker.rerank(q, cands[:RERANK_HEAD], top_k=RERANK_HEAD, batch_size=32)
+            return head + cands[RERANK_HEAD:]
+
+        results["hybrid_rerank"] = run("hybrid_rerank", _rerank)
 
     print("\n=== 中文轨道检索对比（T2Ranking 子集，真 qrels，n=%d）===" % len(queries))
     for name, s in results.items():
@@ -145,6 +165,10 @@ def _parse_args(argv=None):
                    help="cuda / cpu；cuda 不可用时自动回退 cpu")
     p.add_argument("--max-seq-length", type=int, default=1024,
                    help="embedding 截断长度（bge-m3 默认 8192 会撑爆显存）")
+    p.add_argument("--rerank-model", default=None,
+                   help="重排模型路径/名称（如 data/models/bge-reranker-v2-m3）；不给则跳过重排")
+    p.add_argument("--only", default=None,
+                   help="只跑某个变体（如 hybrid_rerank），跳过已有存档的基线以省时间")
     p.add_argument("--out", default=artifacts.DEFAULT_OUT_DIR)
     return p.parse_args(argv)
 
@@ -161,4 +185,5 @@ if __name__ == "__main__":
         except Exception:
             device = "cpu"
     main(directory=a.dir, prefix=a.prefix, topk=a.topk, out_dir=a.out,
-         device=device, max_seq_length=a.max_seq_length)
+         device=device, max_seq_length=a.max_seq_length, rerank_model=a.rerank_model,
+         only=a.only)
