@@ -102,4 +102,6 @@ data/
 
 ## 背景
 
-早期用 FinanceBench（财报 PDF）时，recall 卡在 0.11——根因是财报表格的多行表头无法被 get_text/find_tables/pdfplumber 正确解析（连官方基准自己的抽取都是乱的）。换用纯文本 QA 语料（HotpotQA + TriviaQA）后，recall 提升到 0.78。详见 `data/reports/evaluation_findings.md`。
+早期用 FinanceBench（财报 PDF）时，recall 卡在 0.11——根因是财报表格的多行表头无法被 get_text/find_tables/pdfplumber 正确解析（连官方基准自己的抽取都是乱的）。换用纯文本 QA 语料（HotpotQA + TriviaQA）后，recall 提升到 **0.833**（n=30 分层抽样，逐题明细见 `data/reports/runs/`）。详见 `data/reports/evaluation_findings.md`。
+
+> 两轮语料的定位不同：**FinanceBench 轮**（63 份真实 10-K 年报）贴近「私有知识库」场景，产出表格解析根因证据链；**HotpotQA/TriviaQA 轮**是可复现的量化评测主线。**两组数字不可混用。**
