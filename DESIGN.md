@@ -57,7 +57,7 @@
 │ route_node（意图路由）                                 │
 │   ├─ 语义类  → dense 向量检索                          │
 │   ├─ 关键词/数值类 → BM25 检索                         │
-│   └─ 混合类  → 多路并行（Send API 扇出）               │
+│   └─ 混合类  → 多路检索（顺序调用，⚠️ 未并行化）        │
 │ retrieve_node（多路检索 + 合并去重 + rerank）           │
 │ critique_node（CRAG 检索自纠错：correct/ambiguous/incorrect）│
 │ generate_node（LLM 生成候选答案 + 引用）               │
@@ -218,7 +218,7 @@ verify → unsupported 且 retry 耗尽  → END（降级文案，由 verify_nod
 ```
 问：「A 公司 2024 年营收增速和 B 公司相比如何？」
    │
-route_node ── 混合类（多实体）──→ Send API 扇出
+route_node ── 混合类（多实体）──→ 多路检索（顺序调用）
    │                              ├─ dense 检索「营收增速」
    │                              └─ BM25 检索「A 公司」「B 公司」
    ▼
@@ -289,7 +289,7 @@ CORPORA = {
 | 层 | 选型 |
 |----|------|
 | 语言 | Python 3.11+ |
-| 编排 | LangGraph（StateGraph + 条件边 + 循环 + Send API） |
+| 编排 | LangGraph（StateGraph + 条件边 + 有界循环 + interrupt） |
 | RAG | bge-m3、Faiss、BM25、bge-reranker |
 | LLM | DeepSeek（兼容 OpenAI 协议） |
 | 评估 | RAGAS、MRR/HitRate@k（自实现）、引用命中率 |
