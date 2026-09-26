@@ -1,4 +1,4 @@
-from rag.embeddings import Embedder
+from rag.embeddings import Embedder, clamp_seq_length
 import numpy as np
 
 
@@ -44,3 +44,26 @@ def test_embedder_progress_defaults_to_on():
     emb, calls = _embedder_with_fake_model()
     emb.embed(["a"])
     assert calls["show_progress_bar"] is True
+
+
+# --- max_seq_length 截断：bge-m3 默认 8192 会让 attention mask 撑爆显存 ---
+
+class _FakeST:
+    def __init__(self, msl):
+        self.max_seq_length = msl
+
+
+def test_clamp_seq_length_lowers_the_cap():
+    m = clamp_seq_length(_FakeST(8192), 512)
+    assert m.max_seq_length == 512
+
+
+def test_clamp_seq_length_never_raises_the_cap():
+    """模型本来就更短时不该被「拉长」。"""
+    m = clamp_seq_length(_FakeST(256), 512)
+    assert m.max_seq_length == 256
+
+
+def test_clamp_seq_length_none_keeps_model_default():
+    m = clamp_seq_length(_FakeST(8192), None)
+    assert m.max_seq_length == 8192

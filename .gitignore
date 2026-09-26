@@ -13,3 +13,8 @@ data/models/
 data/zh/T2Ranking/collection.tsv
 data/zh/T2Ranking/dev.bm25.tsv
 data/zh/T2Ranking/dev.dpr.tsv
+# 向量索引与 embedding 分片是派生文件（各 119MB），可由 --device cuda 在 ~43 分钟内重建；
+# 评估结果（data/reports/runs/ 的 jsonl 存档）已提交，足以复算所有指标。
+data/zh/T2Ranking/*.faiss
+data/zh/T2Ranking/emb_cache/
+data/zh/T2Ranking/dense_eval.log

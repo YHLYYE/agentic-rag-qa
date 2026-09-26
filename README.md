@@ -71,8 +71,23 @@ streamlit run src/ui/app.py
 
 ## 评估结果
 
-> ⚠️ **下方这组 n=300 的数字目前没有原始记录**（早期跑完只打印到终端，未落盘），引用前请看 [`data/reports/评估存档说明.md`](data/reports/评估存档说明.md)。
-> 有存档支撑的是 2026-09-26 实跑的 **n=30 分层抽样**：路由准确率 **0.833（25/30）**、faithfulness 0.856 / precision 0.207 / recall 0.833，逐题明细在 `data/reports/runs/`。
+### 主结果：中文检索（T2Ranking，真实人工相关性标注）
+
+评测设定：**1000 条真实中文搜索查询 / 30,365 个段落 / 16,433 条 4 级人工相关性标注**。
+指标为 nDCG@10 / Recall@100 / MRR@10，逐题明细在 `data/reports/runs/`（前缀 `zh_`）。
+
+| 检索器 | nDCG@10 | Recall@100 | MRR@10 |
+|---|---|---|---|
+| BM25（字符 bigram 中文分词） | **0.4749** | **0.8390** | **0.7116** |
+| BM25（英文分词器，作对照） | 0.0498 | 0.0941 | 0.0763 |
+
+**实现正确性验证**：与官方 T2Ranking BM25 基线 run 做**同候选池**对照 —— 官方 0.4638 / 本项目 0.4749（差 2.4%，Top-10 重合率 0.62）。
+详见 [`data/reports/中文检索轨道-T2Ranking.md`](data/reports/中文检索轨道-T2Ranking.md)。
+
+### 对照：英文 benchmark 轮（HotpotQA / TriviaQA）
+
+> ⚠️ 历史那组 n=300 的数字**没有原始记录**（早期只打印到终端），引用前请看 [`data/reports/评估存档说明.md`](data/reports/评估存档说明.md)。
+> 有存档支撑的是 2026-09-26 实跑的 **n=30 分层抽样**：路由准确率 **0.833（25/30）**、faithfulness 0.856 / precision 0.207 / recall 0.833。
 
 | 指标 | 值 |
 |------|-----|
@@ -83,7 +98,17 @@ streamlit run src/ui/app.py
 
 分题型：factoid recall 0.840 / comparison 0.690 / multi-hop 0.810。
 
-复现：`python -m eval.route_accuracy --per-type 10`、`python -m eval.run_qa_eval --per-type 10`（每次都落盘到 `data/reports/runs/`）。
+**两轮语料不可混用**：中文轮用真实 qrels、英文轮用「答案字符串匹配」代理指标，且语料难度不同。
+
+复现：
+```bash
+# 中文轨道（主）
+python -m eval.zh_retrieval --tokenizer zh          # 确定性、零 LLM 成本
+python -m eval.zh_dense_eval                        # dense / 混合对比（CPU 约 80 分钟）
+# 英文对照轮
+python -m eval.route_accuracy --per-type 10
+python -m eval.run_qa_eval --per-type 10
+```
 
 ## 目录结构
 
