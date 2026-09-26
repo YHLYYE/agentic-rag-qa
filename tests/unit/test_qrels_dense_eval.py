@@ -1,9 +1,9 @@
-"""中文 dense 评估：chunk_id 必须与 qrels 的 pid 对得上。
+﻿"""中文 dense 评估：chunk_id 必须与 qrels 的 pid 对得上。
 
 回归背景：曾经用合成 id（p0/p1/...）建 chunk，而 qrels 用真实 pid，
 两边永远匹配不上 —— 结果是**所有指标静默变成 0.0**，不报任何错。
 """
-from eval import zh_dense_eval as zd
+from eval import qrels_dense_eval as zd
 
 
 def test_make_chunks_uses_real_pids_as_chunk_ids():

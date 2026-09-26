@@ -1,12 +1,15 @@
-"""中文检索评估：对着**人工相关性标注（qrels）**算标准 IR 指标。
+"""对 qrels 的检索评估装置（与语料语言无关）。
 
 为什么这件事比"再加一份中文语料"更重要：
 英文那套的检索相关性是用「答案字符串是否出现在 chunk 里」这种**代理指标**衡量的，
 有已知盲区（例如答案是 yes 的是非题永远测不出来）。T2Ranking 带**真实人工标注的
 4 级相关性**，可以直接测检索质量本身，不再依赖代理。
 
+**这个模块按能力命名、不按语言命名**：只要语料带 qrels，换任何语料都能直接用
+（当前默认接 T2Ranking 子集；分词器通过 `--tokenizer` 选择，与语料解耦）。
+
 用法：
-    python -m eval.zh_retrieval --tokenizer zh --topk 100
+    python -m eval.qrels_retrieval --tokenizer zh --topk 100
 """
 from __future__ import annotations
 
@@ -138,7 +141,8 @@ def main(directory: str = DEFAULT_DIR, prefix: str = DEFAULT_PREFIX,
              "ndcg@10": ndcg_at_k(rankings[q], qrels[q], 10),
              "recall@100": recall_at_k(rankings[q], qrels[q], 100)}
             for q in rankings if q in qrels]
-    paths = artifacts.save_run(f"zh_retrieval_{tokenizer}", rows, summary, out_dir=out_dir)
+    # run 标签统一为能力命名；改名前产生的存档仍保留 zh_retrieval_* 前缀（历史记录不改写）
+    paths = artifacts.save_run(f"qrels_retrieval_{tokenizer}", rows, summary, out_dir=out_dir)
     print(f"已落盘: {paths['detail']} | {paths['summary']}", flush=True)
     return summary
 

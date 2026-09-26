@@ -1,5 +1,5 @@
-"""中文检索指标：对着人工相关性标注算 nDCG/Recall/MRR（不再是字符串匹配代理指标）。"""
-from eval import zh_retrieval as zr
+﻿"""中文检索指标：对着人工相关性标注算 nDCG/Recall/MRR（不再是字符串匹配代理指标）。"""
+from eval import qrels_retrieval as zr
 
 
 def test_dcg_and_ndcg_perfect_ranking_is_one():

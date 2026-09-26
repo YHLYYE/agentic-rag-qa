@@ -1,4 +1,4 @@
-# AgenticRAG-QA
+﻿# AgenticRAG-QA
 
 自纠错 + 路由的 Agentic RAG 问答系统，用 LangGraph 编排，带可复现的评估。
 
@@ -115,8 +115,8 @@ Who invented the telephone?   → 应回答「查不到」（不在语料里）�
 复现：
 ```bash
 # 中文轨道（主）
-python -m eval.zh_retrieval --tokenizer zh          # 确定性、零 LLM 成本
-python -m eval.zh_dense_eval                        # dense / 混合对比（CPU 约 80 分钟）
+python -m eval.qrels_retrieval --tokenizer zh          # 确定性、零 LLM 成本
+python -m eval.qrels_dense_eval                        # dense / 混合对比（CPU 约 80 分钟）
 # 英文对照轮
 python -m eval.route_accuracy --per-type 10
 python -m eval.run_qa_eval --per-type 10

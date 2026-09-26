@@ -1,18 +1,18 @@
-"""中文轨道的 dense / 混合检索评估（T2Ranking 子集，对着真 qrels）。
+"""在 qrels 语料上评估 dense / 混合 / 重排（与语料语言无关）。
 
 为什么单独一个脚本：30k 段落用 bge-m3 在 CPU 上向量化约需 80 分钟，
 **必须支持断点续跑**（每批存一个分片，重跑时跳过已算好的分片），
 否则中途任何中断都会让整轮白跑。
 
 用法：
-    python -m eval.zh_dense_eval --corpus subset_q1000.collection.tsv
+    python -m eval.qrels_dense_eval --topk 100 --device cuda
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from eval import artifacts, zh_retrieval as zr
+from eval import artifacts, qrels_retrieval as zr
 
 DEFAULT_DIR = "data/zh/T2Ranking"
 DEFAULT_PREFIX = "subset_q1000"
