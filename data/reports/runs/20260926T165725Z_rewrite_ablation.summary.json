@@ -1,0 +1,16 @@
+{
+  "name": "rewrite_ablation",
+  "timestamp_utc": "20260926T165725Z",
+  "git_rev": "398349b",
+  "n": 20,
+  "summary": {
+    "n": 20,
+    "retriever": "hybrid",
+    "topk": 5,
+    "hit_original(prompt上界)": 0.9,
+    "hit_follow_up(不改写)": 0.15,
+    "hit_rewritten(实际方案)": 0.95,
+    "rewrite_faithful_rate": 0.2
+  },
+  "detail_file": "20260926T165725Z_rewrite_ablation.jsonl"
+}
