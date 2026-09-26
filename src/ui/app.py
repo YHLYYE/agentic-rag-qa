@@ -30,7 +30,7 @@ def load_retrievers(corpus_name: str = "en_qa") -> dict:
 
 @st.cache_resource
 def load_llm():
-    return run_graph.build_llm()
+    return run_graph.build_llm(degrade=True)   # 打不通就降级，别让界面 500
 
 
 @st.cache_resource

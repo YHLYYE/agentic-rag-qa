@@ -287,7 +287,8 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
     args = build_parser().parse_args(argv)
-    llm = ExtractiveLLM() if args.no_llm else build_llm()
+    # 交互入口用 degrade=True：LLM 打不通时返回空答案 → 引用闸门判「答不了」，而不是 500
+    llm = ExtractiveLLM() if args.no_llm else build_llm(degrade=True)
     reranker = build_reranker() if args.rerank else None
 
     print(f"问题：{args.question}")
