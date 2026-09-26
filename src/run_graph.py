@@ -99,6 +99,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rerank", action="store_true",
                    help="启用统一重排（粗排 top-20 → CrossEncoder 精排 → top-8）；"
                         "加载失败会自动降级为不重排")
+    p.add_argument("--clarify", default=None,
+                   help="问题触发澄清时，用这段补充信息续跑（演示 interrupt → resume 闭环）")
+    p.add_argument("--thread", default="cli",
+                   help="checkpoint 的会话标识（同一次多轮对话要一致）")
     p.add_argument("--json", action="store_true", help="打印完整 state（JSON）")
     return p
 
@@ -121,11 +125,32 @@ def initial_state(question: str) -> dict:
     }
 
 
-def run(question: str, retrievers: dict, llm=None, max_retry: int = 2,
-        reranker=None) -> dict:
-    """构建图并跑一次完整链路，返回最终 state。"""
-    graph = build_graph(retrievers, llm, max_retry=max_retry, reranker=reranker)
-    return graph.invoke(initial_state(question))
+def run(question: str, retrievers: dict | None = None, llm=None, max_retry: int = 2,
+        reranker=None, graph=None, thread_id: str | None = None) -> dict:
+    """跑一次完整链路，返回最终 state。
+
+    传入 `graph` + `thread_id` 时启用 checkpoint：问题触发 `interrupt()` 后会**真的暂停并留存**，
+    可以用 `resume()` 带补充信息续跑（此前 checkpointer=None，只能暂停不能恢复）。
+    """
+    g = graph if graph is not None else build_graph(
+        retrievers, llm, max_retry=max_retry, reranker=reranker)
+    if thread_id:
+        return g.invoke(initial_state(question),
+                        {"configurable": {"thread_id": thread_id}})
+    return g.invoke(initial_state(question))
+
+
+def resume(clarification: str, graph, thread_id: str | None) -> dict:
+    """从 `interrupt()` 处续跑。
+
+    必须与首次调用**同一个 graph 实例 + 同一个 thread_id** —— 恢复依赖 checkpointer 里的存档，
+    没有存档就无从恢复（所以这里显式报错，而不是静默返回一个看似正常的空状态）。
+    """
+    if not thread_id:
+        raise ValueError("resume 需要 thread_id：interrupt 的恢复依赖 checkpointer 的存档")
+    from langgraph.types import Command
+    return graph.invoke(Command(resume=clarification),
+                        {"configurable": {"thread_id": thread_id}})
 
 
 def build_reranker(factory=None):
@@ -240,15 +265,22 @@ def main(argv: list[str] | None = None) -> int:
     print("加载检索器 ...", flush=True)
     retrievers = load_retrievers(index_dir, tokenizer=corpus["tokenizer"])
 
-    state = run(args.question, retrievers, llm, max_retry=args.max_retry,
-                reranker=reranker)
+    # 带上 checkpointer，interrupt() 才是"可恢复的暂停"而不是"只能重跑"
+    from langgraph.checkpoint.memory import MemorySaver
+    graph = build_graph(retrievers, llm, max_retry=args.max_retry,
+                        reranker=reranker, checkpointer=MemorySaver())
+    state = run(args.question, graph=graph, thread_id=args.thread)
 
     print("\n=== 链路追踪 ===")
     if "__interrupt__" in state:
         print("[!] 问题过于模糊，图已在 clarify 节点暂停（interrupt）。")
         print(f"    澄清请求：{state['__interrupt__']}")
-        print("    补充信息后重跑即可；恢复需要 checkpointer + Command(resume=...)。")
-        return 0
+        if not args.clarify:
+            print('    加 --clarify "<补充信息>" 即可演示「暂停 → 续跑」闭环。')
+            return 0
+        print(f'    → 用补充信息续跑："{args.clarify}"', flush=True)
+        state = resume(args.clarify, graph, args.thread)
+        print("    [恢复后] 已从 interrupt 处继续执行 ↓\n")
     for line in format_trace(state):
         print(line)
 

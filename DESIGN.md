@@ -133,7 +133,7 @@ verify → unsupported 且 retry 耗尽  → END（降级文案，由 verify_nod
 | 条件边（路由） | `route_node` 多分支 |
 | 循环（有界重试） | `critique/verify → retrieve` 回退环（状态推进 + `max_retry` 硬上限） |
 | 拒答分支 | `critique → give_up → END` |
-| interrupt() 人机协作（stretch） | 歧义问题多轮澄清 + checkpoint 恢复 |
+| interrupt() 人机协作 | 歧义问题暂停澄清 + **checkpoint 恢复已接通**（`MemorySaver` + `thread_id` + `resume()`；CLI `--clarify`、界面「继续」按钮均可演示） |
 
 > ⚠️ **本文档早期版本声称「用 Send API 并行扇出多路检索」—— 这没有实现**（`rg "Send" src` 为 0 命中）。
 > 实际是顺序调用，`src/rag/pipeline.py` 里的 `HybridRerankRetriever` 也是顺序的。

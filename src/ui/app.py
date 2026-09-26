@@ -39,9 +39,44 @@ def load_reranker():
     return run_graph.build_reranker()
 
 
+@st.cache_resource
+def load_graph(corpus_name: str = "en_qa", use_rerank: bool = False):
+    """编译**带 checkpointer** 的图：这样 interrupt() 是「可恢复的暂停」而不是「只能重跑」。
+
+    cache_resource 保证同一次会话里拿到的是**同一个图实例**（恢复依赖它的存档）。
+    """
+    from langgraph.checkpoint.memory import MemorySaver
+    from graph.build import build_graph
+
+    return build_graph(load_retrievers(corpus_name), load_llm(),
+                       reranker=load_reranker() if use_rerank else None,
+                       checkpointer=MemorySaver())
+
+
+def render_state(state: dict) -> None:
+    """渲染一次完整链路的结果（正常定稿与拒答走同一套展示）。"""
+    with st.container(border=True):
+        st.markdown("**链路追踪**")
+        st.text("\n".join(run_graph.format_trace(state)))
+
+    st.subheader("答案")
+    st.markdown(state.get("final_answer") or "（没有产出答案）")
+
+    chunks = state.get("retrieved_chunks") or []
+    st.subheader(f"检索到的资料（{len(chunks)} 段）")
+    for i, chunk in enumerate(chunks, 1):
+        with st.expander(f"{i}. {chunk['chunk_id']}"):
+            st.write(chunk["text"])
+
+
 st.set_page_config(page_title="Agentic RAG 问答", layout="wide")
 st.title("Agentic RAG 问答")
 st.caption("自纠错 + 引用硬闸门：路由 → 多路检索 → CRAG 批判 → 生成 → 引用校验")
+
+# 会话状态：thread_id 用于 checkpoint（澄清恢复要靠它），pending 存被中断的那次请求
+st.session_state.setdefault("thread_id", "web")
+st.session_state.setdefault("pending", None)
+st.session_state.setdefault("pending_cfg", None)
 
 # 用 form 批量提交：否则每敲一个字符都会跑一遍检索 + LLM 生成
 with st.form("ask", border=False):
@@ -60,31 +95,32 @@ with st.form("ask", border=False):
 if submitted and not question.strip():
     st.warning("请先输入问题。")
 elif submitted:
-    retrievers = load_retrievers(corpus_name)
-    llm = load_llm()
-    reranker = load_reranker() if use_rerank else None
     if not run_graph.CORPORA[corpus_name]["has_answers"]:
         st.info("该语料没有标准答案：可以看检索与引用，但不能据此报告「答案正确率」。")
-    if use_rerank and reranker is None:
+    if use_rerank and load_reranker() is None:
         st.warning("精排模型加载失败（多为内存不足），本次已降级为不精排运行。")
 
-    # 先渲染封面与标题，把耗时的链路跑在预留容器里，避免整页卡住
+    graph = load_graph(corpus_name, use_rerank)
     slot = st.container()
     with slot.skeleton():
-        state = run_graph.run(question, retrievers, llm, reranker=reranker)
+        state = run_graph.run(question, graph=graph, thread_id=st.session_state.thread_id)
 
     if "__interrupt__" in state:
-        st.warning("问题过于模糊，链路已在澄清节点暂停。请补充信息后重新提问。")
+        st.session_state.pending = state
+        st.session_state.pending_cfg = (corpus_name, use_rerank)
     else:
-        with st.container(border=True):
-            st.markdown("**链路追踪**")
-            st.text("\n".join(run_graph.format_trace(state)))
+        render_state(state)
 
-        st.subheader("答案")
-        st.markdown(state.get("final_answer") or "（没有产出答案）")
-
-        chunks = state.get("retrieved_chunks") or []
-        st.subheader(f"检索到的资料（{len(chunks)} 段）")
-        for i, chunk in enumerate(chunks, 1):
-            with st.expander(f"{i}. {chunk['chunk_id']}"):
-                st.write(chunk["text"])
+# 澄清态：显示追问输入，补充后从 interrupt 处**续跑**（不是重新提问）
+if st.session_state.pending:
+    st.warning("问题过于模糊，链路已在 clarify 节点暂停 —— 补充信息后会**从暂停处继续**，不会重跑。")
+    with st.form("clarify", border=True):
+        extra = st.text_input("请补充你的问题", placeholder="例如：Who invented the telephone?")
+        go = st.form_submit_button("继续", icon=":material/play_arrow:")
+    if go and extra.strip():
+        corpus_name, use_rerank = st.session_state.pending_cfg
+        state = run_graph.resume(extra, load_graph(corpus_name, use_rerank),
+                                 st.session_state.thread_id)
+        st.session_state.pending = None
+        st.success("已从暂停处续跑完成。")
+        render_state(state)

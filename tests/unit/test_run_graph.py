@@ -149,3 +149,44 @@ def test_run_applies_reranker_when_given():
     state = run_graph.run("did revenue grow?", retrievers, _ScriptedLLM(),
                           reranker=_Reranker())
     assert state["retrieved_chunks"][0]["chunk_id"] == "b"   # 精排把 b 提到第一
+
+
+# --- 真澄清闭环：interrupt 暂停 → resume 续跑（此前 checkpointer=None，只能"暂停"不能"恢复"）---
+
+class _ClarifyLLM:
+    def complete(self, prompt: str) -> str:
+        if "只输出类别名" in prompt:
+            return "factoid"
+        return "Bell {{a}}"
+
+
+def _checkpointed_graph():
+    from langgraph.checkpoint.memory import MemorySaver
+    from graph.build import build_graph
+    chunks = [Chunk("a", "the telephone was invented by Bell", "d", "s", 1)]
+    rets = {"dense": lambda q, k: [RetrievedChunk(chunks[0], 0.9)],
+            "bm25": lambda q, k: [RetrievedChunk(chunks[0], 0.9)]}
+    return build_graph(rets, _ClarifyLLM(), max_retry=2, checkpointer=MemorySaver())
+
+
+def test_ambiguous_question_pauses_with_interrupt():
+    g = _checkpointed_graph()
+    state = run_graph.run("who?", graph=g, thread_id="t-pause")
+    assert "__interrupt__" in state
+    assert not state.get("final_answer")        # 暂停时不该产出答案
+
+
+def test_resume_after_clarification_completes_the_run():
+    g = _checkpointed_graph()
+    run_graph.run("who?", graph=g, thread_id="t-resume")
+    state = run_graph.resume("Who invented the telephone?", g, "t-resume")
+    assert "__interrupt__" not in state          # 恢复后不再暂停
+    assert state["final_answer"]                 # 并且真的跑完了
+    assert state["question"] == "Who invented the telephone?"   # 用的是澄清后的问题
+
+
+def test_resume_without_checkpointer_raises_clear_error():
+    import pytest
+    g = _checkpointed_graph()
+    with pytest.raises(ValueError):
+        run_graph.resume("补充", g, thread_id=None)
