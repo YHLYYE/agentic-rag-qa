@@ -53,20 +53,35 @@ def load_graph(corpus_name: str = "en_qa", use_rerank: bool = False):
                        checkpointer=MemorySaver())
 
 
-def render_state(state: dict) -> None:
-    """渲染一次完整链路的结果（正常定稿与拒答走同一套展示）。"""
+def render_state(state: dict, show_answer: bool = False) -> None:
+    """渲染链路追踪 + **可溯源的引用对照表**。
+
+    答案里的 `{{chunk_id}}`（给机器校验用）会换成 `[1] [2]`，与下面的来源编号一一对应，
+    每条来源都带 source_doc / 页码 / 章节 —— 这就是「引用可溯源」。
+    """
+    rendered_answer, sources = run_graph.number_citations(
+        state.get("final_answer") or "", state.get("retrieved_chunks") or [])
+
     with st.container(border=True):
         st.markdown("**链路追踪**")
         st.text("\n".join(run_graph.format_trace(state)))
 
-    st.subheader("答案")
-    st.markdown(state.get("final_answer") or "（没有产出答案）")
+    if show_answer:
+        st.subheader("答案")
+        st.markdown(rendered_answer or "（没有产出答案）")
 
-    chunks = state.get("retrieved_chunks") or []
-    st.subheader(f"检索到的资料（{len(chunks)} 段）")
-    for i, chunk in enumerate(chunks, 1):
-        with st.expander(f"{i}. {chunk['chunk_id']}"):
-            st.write(chunk["text"])
+    st.subheader(f"引用来源（{len(sources)} 条）")
+    if not sources:
+        st.caption("本条答案没有引用（例如拒答）。")
+    for src in sources:
+        label = f"[{src['n']}] {src.get('source_doc') or src['chunk_id']}"
+        if src.get("page"):
+            label += f" · 第 {src['page']} 页"
+        if src.get("section"):
+            label += f" · {src['section']}"
+        with st.expander(label):
+            st.caption(f"chunk_id: {src['chunk_id']}")
+            st.write(src["text"])
 
 
 st.set_page_config(page_title="Agentic RAG 问答", layout="wide")
@@ -118,7 +133,10 @@ if question:
             st.session_state.pending_cfg = (corpus_name, use_rerank)
         else:
             answer = state.get("final_answer") or "（没有产出答案）"
-            st.markdown(answer)
+            # 气泡里显示**编号后**的答案（[1] [2] 与下方来源对照表一一对应）
+            rendered_answer, _ = run_graph.number_citations(
+                answer, state.get("retrieved_chunks") or [])
+            st.markdown(rendered_answer)
             st.session_state.messages.append({"role": "assistant", "content": answer})
             st.session_state.rag_history.append({"question": question, "answer": answer})
             rendered_state = state
@@ -139,7 +157,7 @@ if st.session_state.pending:
                                  st.session_state.thread_id)
         st.session_state.pending = None
         st.success("已从暂停处续跑完成。")
-        render_state(state)
+        render_state(state, show_answer=True)
         if state.get("final_answer"):
             st.session_state.messages.append({"role": "assistant", "content": state["final_answer"]})
             st.session_state.rag_history.append({"question": extra, "answer": state["final_answer"]})

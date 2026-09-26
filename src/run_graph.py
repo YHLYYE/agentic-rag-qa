@@ -180,6 +180,31 @@ def build_reranker(factory=None):
         return None
 
 
+def number_citations(answer: str, chunks: list[dict]) -> tuple[str, list[dict]]:
+    """把答案里的 `{{chunk_id}}` 换成人类可读的 `[1] [2]`，并返回编号后的来源列表。
+
+    为什么要这一步：`{{chunk_id}}` 是给机器校验用的（`verify_node` 靠它判引用是否真实存在），
+    但给用户看时不可读。编号后用户能直接对照「答案里的 [2]」和下面的「来源 [2]」——
+    这才是**可溯源**：每条引用都能定位到哪份文档、哪一页、哪一节。
+    """
+    by_id = {c["chunk_id"]: c for c in chunks if c.get("chunk_id")}
+    order: dict[str, int] = {}
+
+    def _replace(m):
+        cid = m.group(1)
+        if cid not in by_id:
+            return "[?]"                      # 对不上的引用显式标出，不静默丢弃
+        if cid not in order:
+            order[cid] = len(order) + 1
+        return f"[{order[cid]}]"
+
+    rendered = re.sub(r"\{\{([a-f0-9]+)\}\}", _replace, answer or "")
+    # 来源列表 = **被引用的**那些（这是「引用对照表」，不是「检索结果清单」）
+    sources = [{"n": n, **by_id[cid]} for cid, n in
+               sorted(order.items(), key=lambda kv: kv[1])]
+    return rendered, sources
+
+
 def format_trace(state: dict) -> list[str]:
     """把最终 state 渲染成「每个节点发生了什么」的可读追踪。"""
     route = state.get("route_decision") or {}

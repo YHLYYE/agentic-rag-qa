@@ -154,7 +154,10 @@ def retrieve_node(state: AgenticRAGState, retrievers: dict, reranker=None,
         merged = retrievers["dense"](q, fetch_k)
     if reranker is not None:
         merged = reranker.rerank(q, merged, top_k=top_k)
-    out = [{"chunk_id": rc.chunk.chunk_id, "text": rc.chunk.text, "score": rc.score}
+    # 带上溯源元数据：答案里的引用要能定位到「哪份文档、哪一页、哪一节」
+    out = [{"chunk_id": rc.chunk.chunk_id, "text": rc.chunk.text, "score": rc.score,
+            "source_doc": rc.chunk.source_doc, "page": rc.chunk.page,
+            "section": rc.chunk.section}
            for rc in merged]
     return {"retrieved_chunks": out, "retry_count": attempt + 1}
 
