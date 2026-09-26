@@ -77,39 +77,55 @@ st.caption("自纠错 + 引用硬闸门：路由 → 多路检索 → CRAG 批�
 st.session_state.setdefault("thread_id", "web")
 st.session_state.setdefault("pending", None)
 st.session_state.setdefault("pending_cfg", None)
+st.session_state.setdefault("messages", [])      # 展示用的对话记录
+st.session_state.setdefault("rag_history", [])   # 传给图的多轮历史（只进生成 prompt）
 
-# 用 form 批量提交：否则每敲一个字符都会跑一遍检索 + LLM 生成
-with st.form("ask", border=False):
-    question = st.text_input(
-        "问一个问题",
-        placeholder="例如：Which opera has more acts, La jolie fille de Perth or Mitridate, re di Ponto?",
-    )
+# 语料与精排放在侧栏：chat_input 不能放在 form 里，所以把它们移出表单
+with st.sidebar:
     corpus_name = st.selectbox(
         "语料",
         options=sorted(run_graph.CORPORA),
         format_func=lambda k: run_graph.CORPORA[k]["label"],
     )
     use_rerank = st.toggle("启用统一重排（更准，但延迟约翻倍）", value=False)
-    submitted = st.form_submit_button("提问", icon=":material/search:")
-
-if submitted and not question.strip():
-    st.warning("请先输入问题。")
-elif submitted:
     if not run_graph.CORPORA[corpus_name]["has_answers"]:
         st.info("该语料没有标准答案：可以看检索与引用，但不能据此报告「答案正确率」。")
     if use_rerank and load_reranker() is None:
         st.warning("精排模型加载失败（多为内存不足），本次已降级为不精排运行。")
 
-    graph = load_graph(corpus_name, use_rerank)
-    slot = st.container()
-    with slot.skeleton():
-        state = run_graph.run(question, graph=graph, thread_id=st.session_state.thread_id)
+# 渲染既有对话
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    if "__interrupt__" in state:
-        st.session_state.pending = state
-        st.session_state.pending_cfg = (corpus_name, use_rerank)
-    else:
-        render_state(state)
+# 多轮输入。历史会喂给 rewrite_node 做指代消解（"它的导演是谁" 能被正确改写）
+question = st.chat_input("问一个问题，可追问（如「它的导演是谁？」）")
+if question:
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    graph = load_graph(corpus_name, use_rerank)
+    rendered_state = None
+    with st.chat_message("assistant"):
+        with st.spinner("检索与生成中..."):
+            state = run_graph.run(question, graph=graph,
+                                  thread_id=st.session_state.thread_id,
+                                  history=st.session_state.rag_history)
+        if "__interrupt__" in state:
+            st.warning("问题过于模糊，已在澄清节点暂停。请在下方补充信息，我会**从暂停处继续**。")
+            st.session_state.pending = state
+            st.session_state.pending_cfg = (corpus_name, use_rerank)
+        else:
+            answer = state.get("final_answer") or "（没有产出答案）"
+            st.markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            st.session_state.rag_history.append({"question": question, "answer": answer})
+            rendered_state = state
+    # 开发视图（链路追踪 + 引用来源）放在气泡**外面**折叠显示，保持对话区干净
+    if rendered_state is not None:
+        with st.expander("链路追踪与引用来源", expanded=True):
+            render_state(rendered_state)
 
 # 澄清态：显示追问输入，补充后从 interrupt 处**续跑**（不是重新提问）
 if st.session_state.pending:
@@ -124,3 +140,6 @@ if st.session_state.pending:
         st.session_state.pending = None
         st.success("已从暂停处续跑完成。")
         render_state(state)
+        if state.get("final_answer"):
+            st.session_state.messages.append({"role": "assistant", "content": state["final_answer"]})
+            st.session_state.rag_history.append({"question": extra, "answer": state["final_answer"]})

@@ -107,10 +107,16 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def initial_state(question: str) -> dict:
-    """图的初始 state：字段与 AgenticRAGState 一一对应，缺一个节点就会读不到。"""
+def initial_state(question: str, history: list | None = None) -> dict:
+    """图的初始 state：字段与 AgenticRAGState 一一对应，缺一个节点就会读不到。
+
+    `history` 是多轮对话历史（[{"question","answer"}]）—— 它只进生成 prompt，
+    检索用的是 `rewrite_node` 改写出的独立问题。
+    """
     return {
         "question": question,
+        "history": list(history or []),
+        "rewritten": False,
         "intent": "",
         "route_decision": {},
         "retrieved_chunks": [],
@@ -126,7 +132,8 @@ def initial_state(question: str) -> dict:
 
 
 def run(question: str, retrievers: dict | None = None, llm=None, max_retry: int = 2,
-        reranker=None, graph=None, thread_id: str | None = None) -> dict:
+        reranker=None, graph=None, thread_id: str | None = None,
+        history: list | None = None) -> dict:
     """跑一次完整链路，返回最终 state。
 
     传入 `graph` + `thread_id` 时启用 checkpoint：问题触发 `interrupt()` 后会**真的暂停并留存**，
@@ -135,9 +142,9 @@ def run(question: str, retrievers: dict | None = None, llm=None, max_retry: int 
     g = graph if graph is not None else build_graph(
         retrievers, llm, max_retry=max_retry, reranker=reranker)
     if thread_id:
-        return g.invoke(initial_state(question),
+        return g.invoke(initial_state(question, history),
                         {"configurable": {"thread_id": thread_id}})
-    return g.invoke(initial_state(question))
+    return g.invoke(initial_state(question, history))
 
 
 def resume(clarification: str, graph, thread_id: str | None) -> dict:

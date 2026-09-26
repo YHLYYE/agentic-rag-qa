@@ -134,6 +134,7 @@ verify → unsupported 且 retry 耗尽  → END（降级文案，由 verify_nod
 | 循环（有界重试） | `critique/verify → retrieve` 回退环（状态推进 + `max_retry` 硬上限） |
 | 拒答分支 | `critique → give_up → END` |
 | interrupt() 人机协作 | 歧义问题暂停澄清 + **checkpoint 恢复已接通**（`MemorySaver` + `thread_id` + `resume()`；CLI `--clarify`、界面「继续」按钮均可演示） |
+| 多轮对话（指代消解） | `rewrite_node` 置于图入口：有历史时用 LLM 把「它/这个」改写成**可独立理解的问题**再检索；**历史只进生成 prompt**、不进检索。界面为 chat 形态，历史存 `session_state` |
 
 > ⚠️ **本文档早期版本声称「用 Send API 并行扇出多路检索」—— 这没有实现**（`rg "Send" src` 为 0 命中）。
 > 实际是顺序调用，`src/rag/pipeline.py` 里的 `HybridRerankRetriever` 也是顺序的。

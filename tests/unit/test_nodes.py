@@ -34,7 +34,8 @@ def test_verify_node_unsupported():
 
 
 from models import Chunk, RetrievedChunk
-from graph.nodes import retrieve_node, generate_node, critique_node, give_up_node
+from graph.nodes import (retrieve_node, generate_node, critique_node, give_up_node,
+                         rewrite_node)
 
 
 class _FakeLLM:
@@ -214,6 +215,59 @@ def test_give_up_node_refuses_instead_of_answering():
     assert out["grounding_verdict"] == "unsupported"
     assert out["final_answer"]
     assert out["citations"] == []
+
+
+# --- 多轮对话：指代消解（改写 query 去检索）+ 历史只进生成 prompt ---
+
+class _BoomLLM:
+    def complete(self, prompt: str) -> str:
+        raise AssertionError("没有历史时不该调用 LLM 改写")
+
+
+def test_rewrite_node_is_noop_without_history():
+    out = rewrite_node({"question": "Who invented the telephone?", "history": []},
+                       llm=_BoomLLM())
+    assert out == {}
+
+
+def test_rewrite_node_rewrites_when_history_present():
+    class _LLM:
+        def complete(self, prompt: str) -> str:
+            return "Who directed Inception?"
+
+    out = rewrite_node(
+        {"question": "它的导演是谁？",
+         "history": [{"question": "What is Inception?", "answer": "A 2010 film."}]},
+        llm=_LLM())
+    assert out["question"] == "Who directed Inception?"
+    assert out["rewritten"] is True
+
+
+def test_rewrite_falls_back_to_original_when_llm_returns_nothing():
+    class _LLM:
+        def complete(self, prompt: str) -> str:
+            return "   "
+
+    out = rewrite_node(
+        {"question": "它的导演是谁？", "history": [{"question": "q", "answer": "a"}]},
+        llm=_LLM())
+    assert out.get("question", "它的导演是谁？") == "它的导演是谁？"   # 不能把问题改没了
+
+
+def test_generate_prompt_includes_history_but_retrieval_does_not():
+    prompts = []
+
+    class _LLM:
+        def complete(self, prompt: str) -> str:
+            prompts.append(prompt)
+            return "answer {{a}}"
+
+    generate_node({"question": "它的导演是谁？",
+                   "retrieved_chunks": [{"chunk_id": "a", "text": "Inception was directed by Nolan"}],
+                   "history": [{"question": "What is Inception?", "answer": "A 2010 film."}]},
+                  llm=_LLM())
+    assert "What is Inception?" in prompts[0]      # 历史进生成
+    assert "A 2010 film." in prompts[0]
 
 
 # --- 生产链路接入统一重排（可选，缺省行为必须完全不变）---

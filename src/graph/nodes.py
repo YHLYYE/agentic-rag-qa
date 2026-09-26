@@ -76,6 +76,40 @@ def clarify_node(state: AgenticRAGState) -> dict:
     return {"question": clarification, "needs_clarify": False, "clarification": clarification}
 
 
+_HISTORY_TURNS = 3   # 只带最近 3 轮，控制 token
+
+
+def _format_history(history: list, limit: int = _HISTORY_TURNS) -> str:
+    recent = (history or [])[-limit:]
+    return "\n".join(
+        f"用户：{h.get('question', '')}\n助手：{(h.get('answer') or '')[:200]}"
+        for h in recent
+    )
+
+
+def rewrite_node(state: AgenticRAGState, llm=None) -> dict:
+    """多轮对话的**指代消解**：把「它的导演是谁」改写成能独立理解的问题。
+
+    **为什么要单独一个节点、且只影响检索**：
+    检索需要的是「能独立表达意图的 query」，而生成需要的是「完整对话上下文」。
+    两者混在一起会污染检索（把历史塞进 query 会让检索偏离当前意图）。
+    所以：**改写后的问题去检索，历史只进生成 prompt**。没有历史时本节点是空操作。
+    """
+    history = state.get("history") or []
+    if not history or llm is None:
+        return {}
+    prompt = (
+        "下面是多轮对话的最近几轮，以及用户的最新问题。最新问题里可能有「它/这个/那个」"
+        "这类指代。请把它改写成一个**可以脱离上下文独立理解**的问题，"
+        "只输出改写后的问题本身，不要解释。\n\n"
+        f"{_format_history(history)}\n用户：{state['question']}\n\n改写后的问题："
+    )
+    rewritten = (llm.complete(prompt) or "").strip()
+    if not rewritten:
+        return {}          # 改写失败就沿用原问题 —— 不能把问题改没了
+    return {"question": rewritten, "rewritten": True}
+
+
 _DEGRADED_ANSWER = (
     "抱歉，我没有在知识库中找到足以支撑该结论的资料（已重试 {n} 次）。"
     "请补充问题信息，或直接查阅原始文档。"
@@ -191,8 +225,16 @@ def give_up_node(state: AgenticRAGState) -> dict:
 def generate_node(state: AgenticRAGState, llm) -> dict:
     chunks = state["retrieved_chunks"]
     ctx = "\n".join(f"[{c['chunk_id']}] {c['text']}" for c in chunks)
+    # 历史**只进生成 prompt**（用于理解指代），并明确约束「事实必须以 Context 为准」
+    history = state.get("history") or []
+    hist_block = ""
+    if history:
+        hist_block = (
+            "对话历史（仅供理解指代；事实必须以 Context 为准）：\n"
+            f"{_format_history(history)}\n\n"
+        )
     prompt = (
-        f"Question: {state['question']}\n\nContext:\n{ctx}\n\n"
+        f"{hist_block}Question: {state['question']}\n\nContext:\n{ctx}\n\n"
         "Answer concisely and cite sources inline as {{chunk_id}}."
     )
     answer = llm.complete(prompt)
