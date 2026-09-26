@@ -1,0 +1,50 @@
+{
+  "name": "qrels_gen_latency",
+  "timestamp_utc": "20260926T160045Z",
+  "git_rev": "f43fe29",
+  "n": 30,
+  "summary": {
+    "n_queries": 1000,
+    "device": "cuda",
+    "available_retrievers": [
+      "bm25",
+      "dense",
+      "hybrid",
+      "hybrid_rerank"
+    ],
+    "latency_ms": {
+      "bm25": {
+        "n": 30,
+        "mean_ms": 103.81695000008524,
+        "p50_ms": 99.37490000447724,
+        "p95_ms": 150.63739999459358,
+        "max_ms": 160.5356000000029
+      },
+      "dense": {
+        "n": 30,
+        "mean_ms": 34.2424966666537,
+        "p50_ms": 33.17300000344403,
+        "p95_ms": 42.52049999922747,
+        "max_ms": 55.288600000494625
+      },
+      "hybrid": {
+        "n": 30,
+        "mean_ms": 156.86630666726464,
+        "p50_ms": 145.7790999993449,
+        "p95_ms": 210.19220000016503,
+        "max_ms": 225.18739999941317
+      },
+      "hybrid_rerank": {
+        "n": 30,
+        "mean_ms": 390.8774900000329,
+        "p50_ms": 384.9858000030508,
+        "p95_ms": 440.8605999997235,
+        "max_ms": 469.4913999992423
+      }
+    },
+    "faithfulness": 0.7461111111111111,
+    "faithfulness_n": 30,
+    "dataset": "T2Ranking(dev subset)"
+  },
+  "detail_file": "20260926T160045Z_qrels_gen_latency.jsonl"
+}
