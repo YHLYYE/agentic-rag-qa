@@ -73,3 +73,17 @@ def test_first_hit_rank_distribution():
 
     summary = rm.evaluate_retrieval(retrieve, items, k=3)
     assert summary["first_hit_rank"] == {"1": 1, "2": 1}
+
+
+def test_bench_latency_reports_percentiles_and_calls_every_question():
+    calls = []
+
+    def retrieve(q, k):
+        calls.append(q)
+        return [_RC("x")]
+
+    out = rm.bench_latency(retrieve, ["q1", "q2", "q3", "q4"], k=5, warmup=1)
+    assert out["n"] == 4
+    assert len(calls) == 5          # warmup 1 次 + 正式 4 次
+    for key in ("mean_ms", "p50_ms", "p95_ms", "max_ms"):
+        assert out[key] >= 0

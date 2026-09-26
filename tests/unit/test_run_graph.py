@@ -114,3 +114,38 @@ def test_trace_marks_that_generation_was_skipped_on_refusal():
     text = "\n".join(run_graph.format_trace(state))
     assert "未调用" in text
     assert "知识库里没有检索到" in text
+
+
+# --- 生产链路接入统一重排：可开关 + 加载失败要降级而不是崩 ---
+
+def test_parser_has_rerank_flag_off_by_default():
+    assert run_graph.build_parser().parse_args(["q"]).rerank is False
+    assert run_graph.build_parser().parse_args(["q", "--rerank"]).rerank is True
+
+
+def test_build_reranker_returns_instance_on_success():
+    sentinel = object()
+    assert run_graph.build_reranker(factory=lambda: sentinel) is sentinel
+
+
+def test_build_reranker_degrades_to_none_on_load_failure():
+    """本机内存紧张，加载精排可能 OSError 1455 —— 必须降级而不是让查询崩掉。"""
+    def boom():
+        raise OSError("页面文件太小，无法完成操作。")
+    assert run_graph.build_reranker(factory=boom) is None
+
+
+def test_run_applies_reranker_when_given():
+    chunks = [Chunk("a", "irrelevant text", "d", "s", 1),
+              Chunk("b", "revenue grew 20%", "d", "s", 2)]
+    retrievers = {"dense": lambda q, k: [RetrievedChunk(chunks[0], 0.9),
+                                         RetrievedChunk(chunks[1], 0.5)],
+                  "bm25": lambda q, k: [RetrievedChunk(chunks[0], 0.9)]}
+
+    class _Reranker:
+        def rerank(self, query, retrieved, top_k):
+            return sorted(retrieved, key=lambda rc: rc.chunk.chunk_id != "b")[:top_k]
+
+    state = run_graph.run("did revenue grow?", retrievers, _ScriptedLLM(),
+                          reranker=_Reranker())
+    assert state["retrieved_chunks"][0]["chunk_id"] == "b"   # 精排把 b 提到第一

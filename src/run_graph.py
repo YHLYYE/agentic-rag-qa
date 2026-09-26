@@ -68,6 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="回退重查上限（默认 2）")
     p.add_argument("--no-llm", action="store_true",
                    help="离线模式：不调任何模型接口，用抽取式占位模型跑完整条图")
+    p.add_argument("--rerank", action="store_true",
+                   help="启用统一重排（粗排 top-20 → CrossEncoder 精排 → top-8）；"
+                        "加载失败会自动降级为不重排")
     p.add_argument("--json", action="store_true", help="打印完整 state（JSON）")
     return p
 
@@ -90,10 +93,30 @@ def initial_state(question: str) -> dict:
     }
 
 
-def run(question: str, retrievers: dict, llm=None, max_retry: int = 2) -> dict:
+def run(question: str, retrievers: dict, llm=None, max_retry: int = 2,
+        reranker=None) -> dict:
     """构建图并跑一次完整链路，返回最终 state。"""
-    graph = build_graph(retrievers, llm, max_retry=max_retry)
+    graph = build_graph(retrievers, llm, max_retry=max_retry, reranker=reranker)
     return graph.invoke(initial_state(question))
+
+
+def build_reranker(factory=None):
+    """尝试加载精排模型；**失败时降级为 None（不精排）而不是抛异常**。
+
+    为什么必须降级：本机 15.2GB 内存常驻应用占满，只剩 ~2GB 可用。bge-m3 与
+    bge-reranker 同进程加载约需 4GB，靠 32GB 页面文件勉强撑住 —— 所以是**时好时坏**，
+    实测遇到过 `OSError 1455 页面文件太小`。加载失败就打崩整个查询是不可接受的，
+    重排只是锦上添花，不能成为单点故障。
+    """
+    try:
+        if factory is None:
+            from rag.reranker import Reranker
+            factory = Reranker
+        return factory()
+    except Exception as e:  # 内存不足、模型缺失、依赖损坏都走这里
+        print(f"[警告] 精排模型加载失败（{type(e).__name__}: {str(e)[:80]}），"
+              f"已降级为不精排继续运行。", flush=True)
+        return None
 
 
 def format_trace(state: dict) -> list[str]:
@@ -170,14 +193,18 @@ def main(argv: list[str] | None = None) -> int:
 
     args = build_parser().parse_args(argv)
     llm = ExtractiveLLM() if args.no_llm else build_llm()
+    reranker = build_reranker() if args.rerank else None
 
     print(f"问题：{args.question}")
     print(f"配置：index_dir={args.index_dir}  max_retry={args.max_retry}  "
           f"模型={'离线抽取式占位（--no-llm）' if args.no_llm else 'DeepSeek API'}")
+    if args.rerank:
+        print(f"精排：{'已启用（粗排 top-20 → 精排 top-8）' if reranker else '启用失败，已降级为不精排'}")
     print("加载检索器 ...", flush=True)
     retrievers = load_retrievers(args.index_dir)
 
-    state = run(args.question, retrievers, llm, max_retry=args.max_retry)
+    state = run(args.question, retrievers, llm, max_retry=args.max_retry,
+                reranker=reranker)
 
     print("\n=== 链路追踪 ===")
     if "__interrupt__" in state:

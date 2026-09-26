@@ -95,20 +95,30 @@ def verify_node(state: AgenticRAGState, max_retry: int = 2) -> dict:
     return {"grounding_verdict": "unsupported"}
 
 
-def retrieve_node(state: AgenticRAGState, retrievers: dict) -> dict:
+def retrieve_node(state: AgenticRAGState, retrievers: dict, reranker=None,
+                  recall_k: int = 20) -> dict:
+    """检索节点。
+
+    `reranker=None` 时行为与之前**完全一致**（只取 top_k），保证不引入回退风险；
+    传入 reranker 时改为「粗排多取 recall_k → 精排收敛到 top_k」。
+    """
     from rag.hybrid import merge_and_rerank
     q = state["question"]
     attempt = state.get("retry_count", 0)
     # 回退重查必须改变检索行为：沿用原策略+同一 query 会拿到完全相同的 chunks（原地打转）
     intent = "hybrid" if attempt > 0 else state["intent"]
     top_k = 8 if attempt == 0 else 12
+    # 有精排时粗排多取候选（实测：粗排 top-20 → 精排，比直接取 top-5 明显更好）
+    fetch_k = recall_k if reranker is not None else top_k
     if intent == "hybrid":
-        lists = [r(q, top_k) for r in retrievers.values()]
-        merged = merge_and_rerank(lists, top_k=top_k)
+        lists = [r(q, fetch_k) for r in retrievers.values()]
+        merged = merge_and_rerank(lists, top_k=fetch_k)
     elif intent == "keyword":
-        merged = retrievers["bm25"](q, top_k)
+        merged = retrievers["bm25"](q, fetch_k)
     else:
-        merged = retrievers["dense"](q, top_k)
+        merged = retrievers["dense"](q, fetch_k)
+    if reranker is not None:
+        merged = reranker.rerank(q, merged, top_k=top_k)
     out = [{"chunk_id": rc.chunk.chunk_id, "text": rc.chunk.text, "score": rc.score}
            for rc in merged]
     return {"retrieved_chunks": out, "retry_count": attempt + 1}

@@ -214,3 +214,58 @@ def test_give_up_node_refuses_instead_of_answering():
     assert out["grounding_verdict"] == "unsupported"
     assert out["final_answer"]
     assert out["citations"] == []
+
+
+# --- 生产链路接入统一重排（可选，缺省行为必须完全不变）---
+
+class _FakeReranker:
+    def __init__(self, prefer="gold"):
+        self.prefer = prefer
+        self.seen = None
+
+    def rerank(self, query, retrieved, top_k):
+        self.seen = [rc.chunk.chunk_id for rc in retrieved]
+        ordered = sorted(retrieved, key=lambda rc: rc.chunk.chunk_id != self.prefer)
+        return ordered[:top_k]
+
+
+def _retrievers_recording():
+    chunks = [Chunk("noise", "irrelevant", "d", "s", 1),
+              Chunk("gold", "revenue grew 20%", "d", "s", 2)]
+    calls = []
+
+    def dense(q, k):
+        calls.append(("dense", k))
+        return [RetrievedChunk(chunks[0], 0.9), RetrievedChunk(chunks[1], 0.5)]
+
+    def bm25(q, k):
+        calls.append(("bm25", k))
+        return [RetrievedChunk(chunks[0], 0.9)]
+
+    return {"dense": dense, "bm25": bm25}, calls
+
+
+def test_retrieve_node_reranks_when_reranker_given():
+    retrievers, _ = _retrievers_recording()
+    reranker = _FakeReranker("gold")
+    out = retrieve_node({"question": "q", "intent": "hybrid",
+                         "retrieved_chunks": [], "retry_count": 0},
+                        retrievers, reranker=reranker)
+    assert out["retrieved_chunks"][0]["chunk_id"] == "gold"   # 精排把它提到了第一
+    assert "gold" in reranker.seen                            # 精排看得到它
+
+
+def test_retrieve_node_recalls_deeper_when_reranking():
+    retrievers, calls = _retrievers_recording()
+    retrieve_node({"question": "q", "intent": "hybrid",
+                   "retrieved_chunks": [], "retry_count": 0},
+                  retrievers, reranker=_FakeReranker(), recall_k=20)
+    assert all(k == 20 for _, k in calls)     # 粗排多取，留给精排挑
+
+
+def test_retrieve_node_behaviour_unchanged_without_reranker():
+    retrievers, calls = _retrievers_recording()
+    out = retrieve_node({"question": "q", "intent": "hybrid",
+                         "retrieved_chunks": [], "retry_count": 0}, retrievers)
+    assert all(k == 8 for _, k in calls)                       # 原行为：取 8
+    assert out["retrieved_chunks"][0]["chunk_id"] == "noise"    # 不重排，保持原顺序

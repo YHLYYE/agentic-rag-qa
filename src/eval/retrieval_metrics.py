@@ -89,6 +89,37 @@ def load_eval_set(path: str = "data/qa/eval_set.pkl") -> list[dict]:
         return pickle.load(f)
 
 
+def bench_latency(retrieve_fn, questions: list[str], k: int = 5,
+                  warmup: int = 3) -> dict:
+    """测单次检索延迟（毫秒）。warmup 先跑几次，避免把首次加载/缓存冷启动算进去。
+
+    这是「路由策略平衡精度延迟」的前提：没有 p50/p95 就没法做延迟决策。
+    """
+    import statistics
+    import time
+
+    for q in questions[:warmup]:
+        retrieve_fn(q, k)
+    times_ms = []
+    for q in questions:
+        t0 = time.perf_counter()
+        retrieve_fn(q, k)
+        times_ms.append((time.perf_counter() - t0) * 1000.0)
+    times_ms.sort()
+
+    def _pct(p: float) -> float:
+        idx = min(len(times_ms) - 1, int(round(p / 100 * len(times_ms))) - 1)
+        return times_ms[max(0, idx)]
+
+    return {
+        "n": len(times_ms),
+        "mean_ms": statistics.fmean(times_ms),
+        "p50_ms": _pct(50),
+        "p95_ms": _pct(95),
+        "max_ms": times_ms[-1],
+    }
+
+
 def load_chunks(index_dir: str = "data/qa/index"):
     import pickle
     from pathlib import Path
@@ -133,7 +164,7 @@ def build_retriever(kind: str, index_dir: str = "data/qa/index", device: str = "
 
 def main(retriever: str = "dense", k: int = 5, per_type: int | None = None,
          limit: int | None = None, index_dir: str = "data/qa/index",
-         out_dir: str = artifacts.DEFAULT_OUT_DIR) -> dict:
+         out_dir: str = artifacts.DEFAULT_OUT_DIR, bench: int = 0) -> dict:
     from pathlib import Path
 
     eval_set = load_eval_set()
@@ -145,6 +176,14 @@ def main(retriever: str = "dense", k: int = 5, per_type: int | None = None,
 
     print(f"检索器={retriever}  k={k}  n={len(eval_set)}  索引={index_dir}", flush=True)
     retrieve_fn = build_retriever(retriever, index_dir=index_dir)
+
+    if bench:
+        questions = [it["question"] for it in eval_set[:bench]]
+        stats = bench_latency(retrieve_fn, questions, k=k)
+        print(f"延迟(ms): p50={stats['p50_ms']:.1f}  p95={stats['p95_ms']:.1f}  "
+              f"mean={stats['mean_ms']:.1f}  n={stats['n']}", flush=True)
+        return stats
+
     summary = evaluate_retrieval(retrieve_fn, eval_set, k=k)
 
     print(f"HitRate@{k} = {summary['hit_rate@k']:.4f}   MRR = {summary['mrr']:.4f}   "
@@ -173,6 +212,8 @@ def _parse_args(argv=None):
     p.add_argument("--per-type", type=int, default=None)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--index-dir", default="data/qa/index")
+    p.add_argument("--bench", type=int, default=0,
+                   help="只测延迟：跑前 N 题，输出 p50/p95（不做命中率评估）")
     p.add_argument("--out", default=artifacts.DEFAULT_OUT_DIR)
     return p.parse_args(argv)
 
@@ -180,4 +221,4 @@ def _parse_args(argv=None):
 if __name__ == "__main__":
     a = _parse_args()
     main(retriever=a.retriever, k=a.k, per_type=a.per_type, limit=a.limit,
-         index_dir=a.index_dir, out_dir=a.out)
+         index_dir=a.index_dir, out_dir=a.out, bench=a.bench)
