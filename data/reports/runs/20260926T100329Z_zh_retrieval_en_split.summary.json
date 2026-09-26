@@ -1,0 +1,20 @@
+{
+  "name": "zh_retrieval_en_split",
+  "timestamp_utc": "20260926T100329Z",
+  "git_rev": "fbee3ff",
+  "n": 1000,
+  "summary": {
+    "n": 1000,
+    "ndcg@10": 0.04980777303290646,
+    "recall@10": 0.061085175462652234,
+    "mrr@10": 0.07625317460317461,
+    "ndcg@100": 0.060743514049810585,
+    "recall@100": 0.09406540633429178,
+    "mrr@100": 0.07738429551350835,
+    "tokenizer": "en_split",
+    "corpus_size": 30365,
+    "topk": 100,
+    "dataset": "T2Ranking(dev subset)"
+  },
+  "detail_file": "20260926T100329Z_zh_retrieval_en_split.jsonl"
+}

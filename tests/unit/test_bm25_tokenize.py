@@ -1,6 +1,7 @@
 """BM25 分词：修复「大小写敏感 + 标点不剥离」导致关键词白白失配。"""
 from models import Chunk
-from rag.bm25 import BM25Retriever, simple_tokenize, tokenize_no_stopwords
+from rag.bm25 import (BM25Retriever, simple_tokenize, tokenize_no_stopwords,
+                      zh_tokenize)
 
 
 def test_lowercases_and_strips_punctuation():
@@ -44,3 +45,35 @@ def test_retriever_matches_despite_case_and_punctuation():
               Chunk("b", "methane reacts with oxygen to give carbon dioxide", "d", "s", 2)]
     out = BM25Retriever(chunks).retrieve("WHO invented the TELEPHONE?", top_k=1)
     assert out[0].chunk.chunk_id == "a"
+
+
+# --- 中文分词：simple_tokenize 会把中文全丢掉（只剩数字），必须用 bigram ---
+
+def test_zh_tokenize_makes_character_bigrams():
+    assert zh_tokenize("蜂巢取快递") == ["蜂巢", "巢取", "取快", "快递"]
+
+
+def test_zh_tokenize_handles_short_and_empty_input():
+    assert zh_tokenize("") == []
+    assert zh_tokenize(None) == []
+    assert zh_tokenize("好") == ["好"]
+    assert zh_tokenize("3") == ["3"]
+
+
+def test_zh_tokenize_query_and_corpus_overlap():
+    q = set(zh_tokenize("蜂巢取快递验证码摁错怎么办"))
+    c = set(zh_tokenize("蜂巢快递柜取件时验证码错误如何处理"))
+    assert q & c          # 必须有真实重叠，否则 BM25 无从匹配
+
+
+def test_zh_bm25_actually_retrieves_chinese():
+    chunks = [Chunk("a", "蜂巢快递柜取件验证码错误可以直接联系客服重置", "d", "s", 1),
+              Chunk("b", "产后恢复期腹直肌分离会导致肚子仍然隆起", "d", "s", 2)]
+    out = BM25Retriever(chunks, tokenize=zh_tokenize).retrieve("蜂巢取快递验证码摁错怎么办", top_k=1)
+    assert out[0].chunk.chunk_id == "a"
+
+
+def test_simple_tokenize_would_fail_on_the_same_chinese_query():
+    """留证据：默认英文分词器在中文上几乎无 token，这就是必须单独做中文分词的原因。"""
+    tokens = simple_tokenize("蜂巢取快递验证码摁错怎么办")
+    assert len(tokens) <= 1

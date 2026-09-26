@@ -1,0 +1,20 @@
+{
+  "name": "zh_retrieval_zh",
+  "timestamp_utc": "20260926T100321Z",
+  "git_rev": "fbee3ff",
+  "n": 1000,
+  "summary": {
+    "n": 1000,
+    "ndcg@10": 0.47489180175950435,
+    "recall@10": 0.5702320985871949,
+    "mrr@10": 0.71159126984127,
+    "ndcg@100": 0.5674138242170251,
+    "recall@100": 0.8390463214132899,
+    "mrr@100": 0.7134431559749919,
+    "tokenizer": "zh",
+    "corpus_size": 30365,
+    "topk": 100,
+    "dataset": "T2Ranking(dev subset)"
+  },
+  "detail_file": "20260926T100321Z_zh_retrieval_zh.jsonl"
+}

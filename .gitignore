@@ -8,3 +8,8 @@ data/index/
 .env
 
 data/models/
+
+# 中文语料轨：原始 collection 太大（3.5GB），只提交派生的小文件
+data/zh/T2Ranking/collection.tsv
+data/zh/T2Ranking/dev.bm25.tsv
+data/zh/T2Ranking/dev.dpr.tsv
