@@ -18,3 +18,6 @@ data/zh/T2Ranking/dev.dpr.tsv
 data/zh/T2Ranking/*.faiss
 data/zh/T2Ranking/emb_cache/
 data/zh/T2Ranking/dense_eval.log
+# 导出给问答入口用的同构索引（chunks.pkl 61MB + faiss.index 119MB），
+# 由 `python -m ingest.export_zh_index` 从语料 TSV + embedding 分片重建
+data/zh/T2Ranking/index/

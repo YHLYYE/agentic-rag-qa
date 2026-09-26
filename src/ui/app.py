@@ -19,13 +19,13 @@ import streamlit as st
 
 import run_graph
 
-INDEX_DIR = "data/qa/index"
-
-
 @st.cache_resource
-def load_retrievers(index_dir: str = INDEX_DIR) -> dict:
-    # device="cpu"：本机 8GB 显存跑 bge-m3 会爆（与 run_graph 一致）
-    return run_graph.load_retrievers(index_dir, device="cpu")
+def load_retrievers(corpus_name: str = "en_qa") -> dict:
+    """按语料加载检索器 —— 索引目录与分词器都由语料档案决定（分词器用错会让 BM25 失效）。"""
+    corpus = run_graph.CORPORA[corpus_name]
+    # device="cpu"：界面与显存敏感，强制 CPU（与 run_graph 的演示路径一致）
+    return run_graph.load_retrievers(corpus["index_dir"], device="cpu",
+                                     tokenizer=corpus["tokenizer"])
 
 
 @st.cache_resource
@@ -49,15 +49,22 @@ with st.form("ask", border=False):
         "问一个问题",
         placeholder="例如：Which opera has more acts, La jolie fille de Perth or Mitridate, re di Ponto?",
     )
+    corpus_name = st.selectbox(
+        "语料",
+        options=sorted(run_graph.CORPORA),
+        format_func=lambda k: run_graph.CORPORA[k]["label"],
+    )
     use_rerank = st.toggle("启用统一重排（更准，但延迟约翻倍）", value=False)
     submitted = st.form_submit_button("提问", icon=":material/search:")
 
 if submitted and not question.strip():
     st.warning("请先输入问题。")
 elif submitted:
-    retrievers = load_retrievers()
+    retrievers = load_retrievers(corpus_name)
     llm = load_llm()
     reranker = load_reranker() if use_rerank else None
+    if not run_graph.CORPORA[corpus_name]["has_answers"]:
+        st.info("该语料没有标准答案：可以看检索与引用，但不能据此报告「答案正确率」。")
     if use_rerank and reranker is None:
         st.warning("精排模型加载失败（多为内存不足），本次已降级为不精排运行。")
 

@@ -35,6 +35,32 @@ DEFAULT_INDEX_DIR = "data/qa/index"
 DEFAULT_EMBED_MODEL = "BAAI/bge-m3"
 DEFAULT_EMBED_DIM = 1024
 
+# 语料档案：把「索引目录 + 分词器 + 是否有标准答案」收成一处可选项。
+# 关键点：**分词器必须随语料走** —— 英文分词器在中文上几乎不产生 token（实测 nDCG@10 0.0498 vs 0.4749）。
+CORPORA = {
+    "en_qa": {
+        "index_dir": "data/qa/index",
+        "tokenizer": "en",
+        "label": "英文 QA benchmark（HotpotQA / TriviaQA）",
+        "has_answers": True,
+    },
+    "zh_t2": {
+        "index_dir": "data/zh/T2Ranking/index",
+        "tokenizer": "zh",
+        "label": "T2Ranking 检索子集（真实中文查询；**无标准答案**，只能看检索与忠实度）",
+        "has_answers": False,
+    },
+}
+
+
+def resolve_tokenizer(kind: str):
+    from rag.bm25 import tokenize_no_stopwords, zh_tokenize
+    if kind == "zh":
+        return zh_tokenize
+    if kind == "en":
+        return tokenize_no_stopwords
+    raise ValueError(f"未知分词器: {kind}")
+
 # 生成 prompt 里每个上下文片段形如 "[chunk_id] 正文"
 _CONTEXT_LINE = re.compile(r"^\[([a-f0-9]+)\]\s*(.+)$", re.MULTILINE)
 
@@ -64,6 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("question", help="要问的问题")
     p.add_argument("--index-dir", default=DEFAULT_INDEX_DIR,
                    help=f"索引目录（默认 {DEFAULT_INDEX_DIR}）")
+    p.add_argument("--corpus", default="en_qa", choices=sorted(CORPORA),
+                   help="语料档案：决定索引目录与分词器（zh_t2 为中文检索语料）")
     p.add_argument("--max-retry", type=int, default=2,
                    help="回退重查上限（默认 2）")
     p.add_argument("--no-llm", action="store_true",
@@ -163,8 +191,12 @@ def format_trace(state: dict) -> list[str]:
 def load_retrievers(index_dir: str = DEFAULT_INDEX_DIR,
                     embed_model: str = DEFAULT_EMBED_MODEL,
                     embed_dim: int = DEFAULT_EMBED_DIM,
-                    device: str | None = "cpu") -> dict:
-    """加载离线索引 + 两个检索器，返回 {name: retrieve_fn} 供图使用。"""
+                    device: str | None = "cpu",
+                    tokenizer: str = "en") -> dict:
+    """加载离线索引 + 两个检索器，返回 {name: retrieve_fn} 供图使用。
+
+    `tokenizer` 必须与语料匹配（"en" / "zh"）—— 用错会让 BM25 那一路基本失效。
+    """
     import pickle
 
     from rag.bm25 import BM25Retriever
@@ -178,7 +210,7 @@ def load_retrievers(index_dir: str = DEFAULT_INDEX_DIR,
     embedder = Embedder(model_name=embed_model, dim=embed_dim, device=device,
                         show_progress=False)
     dense = DenseRetriever(chunks, embedder, str(index_path / "faiss.index"))
-    bm25 = BM25Retriever(chunks)
+    bm25 = BM25Retriever(chunks, tokenize=resolve_tokenizer(tokenizer))
     return {"dense": dense.retrieve, "bm25": bm25.retrieve}
 
 
@@ -196,12 +228,17 @@ def main(argv: list[str] | None = None) -> int:
     reranker = build_reranker() if args.rerank else None
 
     print(f"问题：{args.question}")
-    print(f"配置：index_dir={args.index_dir}  max_retry={args.max_retry}  "
+    corpus = CORPORA[args.corpus]
+    index_dir = corpus["index_dir"]
+    print(f"配置：语料={args.corpus}（{corpus['label']}）  max_retry={args.max_retry}  "
           f"模型={'离线抽取式占位（--no-llm）' if args.no_llm else 'DeepSeek API'}")
+    print(f"      index_dir={index_dir}  分词器={corpus['tokenizer']}")
+    if not corpus["has_answers"]:
+        print("提示：该语料**没有标准答案**，只能演示检索与忠实度，不能算答案正确率。")
     if args.rerank:
         print(f"精排：{'已启用（粗排 top-20 → 精排 top-8）' if reranker else '启用失败，已降级为不精排'}")
     print("加载检索器 ...", flush=True)
-    retrievers = load_retrievers(args.index_dir)
+    retrievers = load_retrievers(index_dir, tokenizer=corpus["tokenizer"])
 
     state = run(args.question, retrievers, llm, max_retry=args.max_retry,
                 reranker=reranker)
