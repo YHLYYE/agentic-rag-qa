@@ -10,6 +10,8 @@ data/index/
 data/models/
 
 # 中文语料轨：原始 collection 太大（3.5GB），只提交派生的小文件
+# 演示「增量索引」时产生的临时索引目录（docs/演示清单.md 演示 9）
+data/tmp_*/
 data/zh/T2Ranking/collection.tsv
 data/zh/T2Ranking/dev.bm25.tsv
 data/zh/T2Ranking/dev.dpr.tsv
