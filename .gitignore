@@ -23,3 +23,17 @@ data/zh/T2Ranking/dense_eval.log
 # 导出给问答入口用的同构索引（chunks.pkl 61MB + faiss.index 119MB），
 # 由 `python -m ingest.export_zh_index` 从语料 TSV + embedding 分片重建
 data/zh/T2Ranking/index/
+
+# 原始 QA 数据集（parquet，可从 HuggingFace 重新下载；单文件最大 237MB，超出 GitHub 单文件上限）
+data/raw_qa/
+
+# 派生的检索索引与候选池（可由评估脚本重建，不入库）
+data/qa/index/
+data/qa/hybrid_candidates*.pkl
+
+# AI 生成的分步实施计划（保留在本地，不入库）
+docs/plans/
+
+# 指向本地 conda 环境内 streamlit 包的符号链接（克隆后必为坏链）
+.agents/
+.claude/
