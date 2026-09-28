@@ -37,3 +37,11 @@ docs/plans/
 # 指向本地 conda 环境内 streamlit 包的符号链接（克隆后必为坏链）
 .agents/
 .claude/
+
+# 面试 / 简历 / 演示类文档（属于个人准备材料，公开仓库不放）
+docs/面试*.md
+docs/演示*.md
+data/reports/评估存档说明.md
+PROJECT_GUIDE.md
+PROJECT_GUIDE.docx
+*简历*

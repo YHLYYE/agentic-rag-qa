@@ -1,7 +1,7 @@
 # src/eval 脚本索引：每个脚本对应哪个已归档的结论
 
 > 这个目录看起来"脚本很多、互相重叠"，但每个脚本其实对应一个**已经写进报告的具体结论**。
-> 这份索引的作用：面试官问"这些都要吗"时，你能一条条对上「脚本 → 结论 → 存档」。
+> 这份索引把每个脚本对上「脚本 → 结论 → 存档」，避免"脚本很多、互相重叠"的误读。
 > 2026-09-26 清理：删掉了 3 个无产出的死脚本（见文末）。
 
 ## 一、脚本 → 归档结论对照
@@ -15,10 +15,10 @@
 | `run_topk_sweep.py` | top-K 扫描（拆句法版） | 与简版对照，佐证「简版指标噪声大」 |
 | `run_eval.py` | FinanceBench 三组检索对照（MRR / HitRate@5） | `evaluation_findings.md` §2.1（naive dense / hybrid / routed 三行） |
 | `run_rerank_compare.py` | 无重排 vs bge-reranker（FinanceBench） | `evaluation_findings.md` §2.2 的两个重排列 |
-| `run_qa_rerank.py` | 无重排 vs bge-reranker（QA 语料） | 简历「reranker 提升 precision」（**原始记录缺失**，见 评估存档说明） |
+| `run_qa_rerank.py` | 无重排 vs bge-reranker（QA 语料） | 早期「reranker 提升 precision」结论（**原始记录缺失**）；有存档的对照在 `evaluation_findings.md` §2.2 |
 | `ragas_patch.py` | 官方 ragas 0.4.3 的 vertexai import monkey patch | `evaluation_findings.md` §5 环境记录（解释为什么改用自实现） |
 | `artifacts.py` | 逐题明细 + 汇总落盘（自校验、带 git 版本） | `data/reports/runs/` 全部存档 |
-| `sampling.py` | 分层抽样，避免「取前缀 = 单题型」假证据 | 见 `data/reports/评估存档说明.md` 第五节 |
+| `sampling.py` | 分层抽样，避免「取前缀 = 单题型」假证据 | 各 `run_*.py` 的 `--sample` 参数；抽样逻辑见模块 docstring |
 | `metrics.py` | MRR / HitRate@k（被 `run_eval.py` 使用） | `evaluation_findings.md` §2.1 |
 
 ## 二、为什么 FinanceBench 那批脚本要留着

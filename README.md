@@ -98,17 +98,14 @@ Who invented the telephone?   → 应回答「查不到」（不在语料里）�
 
 ### 对照：英文 benchmark 轮（HotpotQA / TriviaQA）
 
-> ⚠️ 历史那组 n=300 的数字**没有原始记录**（早期只打印到终端），引用前请看 [`data/reports/评估存档说明.md`](data/reports/评估存档说明.md)。
-> 有存档支撑的是 2026-09-26 实跑的 **n=30 分层抽样**：路由准确率 **0.833（25/30）**、faithfulness 0.856 / precision 0.207 / recall 0.833。
+2026-09-26 实跑的 **n=30 分层抽样**，逐题明细在 `data/reports/runs/*_route_accuracy.*` 与 `*_qa_ragas.*`：
 
 | 指标 | 值 |
 |------|-----|
-| 路由准确率 | 84.3%（300 题，三类分流） |
-| recall（整体） | 0.780 |
-| faithfulness | 0.785 |
-| precision | 0.232 |
-
-分题型：factoid recall 0.840 / comparison 0.690 / multi-hop 0.810。
+| 路由准确率 | 0.833（25/30，三类分流） |
+| faithfulness | 0.856 |
+| precision | 0.207 |
+| recall（整体） | 0.833 |
 
 **两轮语料不可混用**：中文轮用真实 qrels、英文轮用「答案字符串匹配」代理指标，且语料难度不同。
 
