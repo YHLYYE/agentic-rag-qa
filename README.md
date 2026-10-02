@@ -134,6 +134,18 @@ python -m eval.route_accuracy --per-type 10
 python -m eval.run_qa_eval --per-type 10
 ```
 
+**复现前要知道的三件事**：
+
+1. **不能一键复现。** 向量索引、embedding 分片和模型权重都是派生文件，没有入库
+   （见 `.gitignore`）。clone 之后要先重建：中文轨道索引可由 `--device cuda` 在 ~43 分钟内重建，
+   CPU 上更久；`data/models/` 需要自行准备 bge-m3 与 bge-reranker-v2-m3。
+2. **汇总数字对应哪一次运行，看存档。** 例如 nDCG@10 = 0.6021 出自
+   `data/reports/runs/20260926T151111Z_zh_hybrid_rerank.summary.json`（n=1000），
+   同目录同名 `.jsonl` 是逐题明细——每题检索到哪些 chunk、单题指标是多少。
+3. **存档里的 `git_rev` 字段已失效。** 为了让仓库能推上 GitHub，过大文件（原始 parquet、
+   派生索引）被从历史中剔除，**所有 commit hash 都已重写**，因此存档中记录的短哈希查不到了。
+   对应源码内容未变，但那条"数字 → 代码版本"的线索现在是断的——复现时应以当前 HEAD 为准。
+
 ## 目录结构
 
 ```
