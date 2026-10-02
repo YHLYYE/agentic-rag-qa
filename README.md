@@ -119,7 +119,10 @@ Who invented the telephone?   → 应回答「查不到」（不在语料里）�
 - **人机澄清闭环**：`interrupt()` 暂停 + `MemorySaver` 存档 + `resume()` 续跑
   （CLI `--clarify`、界面「继续」按钮）。
 - **多轮对话**：`rewrite_node` 做指代消解 —— **改写后的问题去检索、历史只进生成 prompt**。
-  消融实测：不改写 HitRate@5 **0.15** → 改写后 **0.95**（+0.80），改写保真率 20/20。
+  消融实测（n=20，hybrid，k=5）：不改写 HitRate@5 **0.15** → 改写后 **0.95**（+0.80）。
+  ⚠️ 「改写保真率」这个指标**不作结论使用**：同一版代码、同一批题、连判官输入都一字不差，
+  两次跑出的值分别是 **0.2 和 1.0**（见 `data/reports/runs/*_rewrite_ablation.summary.json`）。
+  它反映的是 LLM 判官的方差，不是改写质量本身。
 
 复现：
 ```bash
