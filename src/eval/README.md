@@ -1,5 +1,11 @@
 # src/eval 脚本索引：每个脚本对应哪个已归档的结论
 
+> **对账数字用 `python -m eval.verify_claims`。** 它把 README / DESIGN / 简历里
+> 引用过的每个数字，和 `data/reports/runs/` 的存档 + 逐题明细对一遍：
+> ① 从明细重算汇总（证明汇总不是手写的）② 文档写的精度和存档精确值一致
+> ③ 该字符串确实出现在那份文档里 ④ 已撤下的旧值没有残留。
+> 三道不过就退出码非 0。只用标准库，不加载 faiss / 模型。
+
 > 这个目录看起来"脚本很多、互相重叠"，但每个脚本其实对应一个**已经写进报告的具体结论**。
 > 这份索引把每个脚本对上「脚本 → 结论 → 存档」，避免"脚本很多、互相重叠"的误读。
 > 2026-09-26 清理：删掉了 3 个无产出的死脚本（见文末）。
@@ -8,7 +14,7 @@
 
 | 脚本 | 干什么 | 对应哪个已归档的结论 |
 |---|---|---|
-| `route_accuracy.py` | LLM 意图路由 vs 真实标签，含混淆矩阵 | `data/reports/runs/*_route_accuracy.*`（n=30 实测 0.833）；README 的 84.3%（n=300，**无原始记录**） |
+| `route_accuracy.py` | LLM 意图路由 vs 真实标签，含混淆矩阵 | `data/reports/runs/*_route_accuracy.*`（n=30 实测 0.833）。早期 n=300 那组 84.3% **无原始记录，已从 README 撤下** |
 | `run_qa_eval.py` | QA 语料 RAGAS 三指标，分题型 | `data/reports/runs/*_qa_ragas.*`（n=30：0.856 / 0.207 / 0.833） |
 | `ragas_self.py` | 拆句法指标实现（被 `run_qa_eval` 复用） | `evaluation_findings.md` §4「可靠的最终指标（拆句法）」 |
 | `run_topk_sweep_fast.py` | top-K 扫描（单次粗判的简版指标） | `evaluation_findings.md` §2.4 top-K 表（top-5 最优） |

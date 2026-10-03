@@ -72,7 +72,7 @@ def test_graph_honors_max_retry_param():
     assert out.get("final_answer")
 
 
-# --- 回归：图必须真的用上 LLM 路由（否则 84.3% 的路由能力在演示里是死代码）---
+# --- 回归：图必须真的用上 LLM 路由（否则这条路由能力在演示里是死代码）---
 
 class _RouterAndAnswerLLM:
     """路由 prompt → 指定类别；检索评估 prompt → correct；生成 prompt → 带真实引用的答案。"""
